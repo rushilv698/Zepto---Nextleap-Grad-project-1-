@@ -45,9 +45,13 @@ def _load_theme_centroids() -> list[dict]:
     return themes
 
 
-def _fetch_pending(limit: int) -> list[dict]:
+def _fetch_pending(limit: int, recheck_candidates: bool = False) -> list[dict]:
+    """Pending snippets to try assigning. If recheck_candidates=True, ALSO
+    re-tries snippets currently in the candidate pool (used when threshold
+    has been lowered or new themes were just promoted)."""
+    candidate_clause = "" if recheck_candidates else "AND tc.snippet_id IS NULL"
     q = text(
-        """
+        f"""
         SELECT r.id AS snippet_id
         FROM raw_snippets r
         JOIN snippet_quality sq ON sq.snippet_id = r.id
@@ -58,7 +62,7 @@ def _fetch_pending(limit: int) -> list[dict]:
           AND sq.is_relevant = true
           AND sq.dup_of IS NULL
           AND rt.snippet_id IS NULL
-          AND tc.snippet_id IS NULL
+          {candidate_clause}
         ORDER BY sq.info_value_score DESC NULLS LAST
         LIMIT :lim
         """
@@ -117,6 +121,10 @@ def _batch_assign(rows: list[dict], themes: list[dict], threshold: float, coll) 
                 "VALUES (:sid, :tid, :sim, 'cosine', :v) "
                 "ON CONFLICT (snippet_id, theme_id) DO NOTHING"
             ), [{**a, "v": TAXONOMY_VERSION} for a in assigns])
+            # If they came from candidate pool, remove them
+            conn.execute(text(
+                "DELETE FROM theme_candidates WHERE snippet_id = ANY(:ids)"
+            ), {"ids": [a["sid"] for a in assigns]})
         if defers:
             conn.execute(text(
                 "INSERT INTO theme_candidates (snippet_id, info_value_score) "
@@ -154,16 +162,18 @@ def _update_centroids() -> None:
 
 
 def run(threshold: float = DEFAULT_THRESHOLD, batch: int = 500,
-        max_batches: int = 40, refresh_centroids: bool = True) -> tuple[int, int]:
+        max_batches: int = 40, refresh_centroids: bool = True,
+        recheck_candidates: bool = False) -> tuple[int, int]:
     themes = _load_theme_centroids()
     if not themes:
         log.error("themes_assign: no themes loaded. Run themes_seed first.")
         return 0, 0
     coll = wclient().collections.get(CLASS_NAME)
     total_assigns, total_defers = 0, 0
-    log.info("themes_assign: %d themes loaded, threshold=%.2f", len(themes), threshold)
+    log.info("themes_assign: %d themes loaded, threshold=%.2f, recheck_candidates=%s",
+             len(themes), threshold, recheck_candidates)
     for i in range(max_batches):
-        rows = _fetch_pending(batch)
+        rows = _fetch_pending(batch, recheck_candidates=recheck_candidates)
         if not rows:
             break
         a, d = _batch_assign(rows, themes, threshold, coll)
@@ -183,7 +193,10 @@ if __name__ == "__main__":
     ap.add_argument("--batch", type=int, default=500)
     ap.add_argument("--max-batches", type=int, default=40)
     ap.add_argument("--no-refresh-centroids", action="store_true")
+    ap.add_argument("--recheck-candidates", action="store_true",
+                    help="Also re-try snippets currently in the candidate pool (use after lowering threshold or promoting new themes)")
     ap.add_argument("--log-level", default="INFO")
     args = ap.parse_args()
     logging.basicConfig(level=args.log_level, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
-    run(args.threshold, args.batch, args.max_batches, not args.no_refresh_centroids)
+    run(args.threshold, args.batch, args.max_batches, not args.no_refresh_centroids,
+        recheck_candidates=args.recheck_candidates)

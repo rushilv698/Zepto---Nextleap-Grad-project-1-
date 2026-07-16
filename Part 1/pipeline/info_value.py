@@ -81,7 +81,7 @@ def run(batch: int = 5000) -> int:
         """
         SELECT snippet_id, specificity, clarity, actionability, behaviour_flags, novelty
         FROM snippet_quality
-        WHERE is_spam IS NOT NULL AND (info_value_score IS NULL OR updated_at > NOW() - interval '10 minutes')
+        WHERE is_spam IS NOT NULL AND info_value_score IS NULL
         LIMIT :lim
         """
     )

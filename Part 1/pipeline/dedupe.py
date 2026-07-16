@@ -58,15 +58,21 @@ def _ensure_row(conn, snippet_id: str) -> None:
 
 
 def _pending_batch(limit: int) -> list[dict]:
-    """Snippets embedded but not yet checked for duplicates."""
+    """Snippets embedded but not yet checked for duplicates.
+
+    Uses a helper column `snippet_quality._dedup_checked_at` to track completion.
+    Ensures we don't rescan already-checked snippets."""
+    with engine().begin() as conn:
+        conn.execute(text(
+            "ALTER TABLE snippet_quality ADD COLUMN IF NOT EXISTS _dedup_checked_at TIMESTAMPTZ"
+        ))
     q = text(
         """
         SELECT es.snippet_id, r.ingested_at
         FROM embedded_snippets es
         JOIN raw_snippets r ON r.id = es.snippet_id
         LEFT JOIN snippet_quality sq ON sq.snippet_id = es.snippet_id
-        WHERE sq.snippet_id IS NULL
-           OR (sq.snippet_id IS NOT NULL AND sq.dup_of IS NULL AND sq.updated_at < r.ingested_at)
+        WHERE sq._dedup_checked_at IS NULL
         ORDER BY r.ingested_at
         LIMIT :lim
         """
@@ -131,15 +137,15 @@ def run(threshold: float = 0.95, batch_size: int = 500, max_neighbours: int = 5)
                     dup_of = other_id
                     break
             pairs.append({"sid": sid, "dup_of": dup_of})
-        # Bulk upsert
+        # Bulk upsert — always mark dedup_checked, only set dup_of when found
         if pairs:
             with engine().begin() as conn:
                 conn.execute(
                     text(
-                        "INSERT INTO snippet_quality (snippet_id, dup_of, updated_at) "
-                        "VALUES (:sid, :dup_of, NOW()) "
+                        "INSERT INTO snippet_quality (snippet_id, dup_of, _dedup_checked_at, updated_at) "
+                        "VALUES (:sid, :dup_of, NOW(), NOW()) "
                         "ON CONFLICT (snippet_id) DO UPDATE "
-                        "SET dup_of=EXCLUDED.dup_of, updated_at=NOW()"
+                        "SET dup_of=EXCLUDED.dup_of, _dedup_checked_at=NOW(), updated_at=NOW()"
                     ),
                     pairs,
                 )

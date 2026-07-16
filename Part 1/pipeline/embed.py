@@ -60,14 +60,21 @@ _ENSURE_EMBEDDED_TABLE = text(
 
 
 def _pending_batch(limit: int) -> list[dict]:
+    """Pending = anything that passes EITHER the v1 filter (filtered_snippets)
+    OR the v2 filter (snippet_quality: not spam, relevant, not dup)."""
     q = text(
         """
-        SELECT f.snippet_id, r.source, r.text
-        FROM filtered_snippets f
-        JOIN raw_snippets r ON r.id = f.snippet_id
-        LEFT JOIN embedded_snippets es ON es.snippet_id = f.snippet_id
+        WITH candidates AS (
+            SELECT snippet_id FROM filtered_snippets
+            UNION
+            SELECT snippet_id FROM snippet_quality
+            WHERE is_spam = false AND is_relevant = true AND dup_of IS NULL
+        )
+        SELECT c.snippet_id, r.source, r.text
+        FROM candidates c
+        JOIN raw_snippets r ON r.id = c.snippet_id
+        LEFT JOIN embedded_snippets es ON es.snippet_id = c.snippet_id
         WHERE es.snippet_id IS NULL
-        ORDER BY f.filtered_at
         LIMIT :lim
         """
     )
