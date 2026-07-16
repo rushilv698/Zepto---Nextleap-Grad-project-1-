@@ -37,7 +37,8 @@ log = logging.getLogger(__name__)
 
 CRITIC_PROMPT_VERSION = "critic_v1"
 _CRITIC_PROMPT = load_prompt("critic_v1.txt")
-TAXONOMY_VERSION = 1
+import os as _os
+TAXONOMY_VERSION = int(_os.environ.get("V2_TAXONOMY_VERSION", "1"))
 
 # Thresholds (from plan)
 MIN_EVIDENCE = 5

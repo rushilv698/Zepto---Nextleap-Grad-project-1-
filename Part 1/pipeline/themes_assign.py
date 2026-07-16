@@ -24,7 +24,8 @@ from .storage import engine
 
 log = logging.getLogger(__name__)
 
-TAXONOMY_VERSION = 1
+import os as _os
+TAXONOMY_VERSION = int(_os.environ.get("V2_TAXONOMY_VERSION", "1"))
 DEFAULT_THRESHOLD = 0.75
 
 
@@ -45,11 +46,15 @@ def _load_theme_centroids() -> list[dict]:
     return themes
 
 
-def _fetch_pending(limit: int, recheck_candidates: bool = False) -> list[dict]:
+def _fetch_pending(limit: int, recheck_candidates: bool = False,
+                   expansion_only: bool = False) -> list[dict]:
     """Pending snippets to try assigning. If recheck_candidates=True, ALSO
     re-tries snippets currently in the candidate pool (used when threshold
-    has been lowered or new themes were just promoted)."""
+    has been lowered or new themes were just promoted).
+    If expansion_only=True, restrict to snippets with expansion-related
+    behaviour_flags."""
     candidate_clause = "" if recheck_candidates else "AND tc.snippet_id IS NULL"
+    expansion_clause = "AND sq.is_expansion_relevant = true" if expansion_only else ""
     q = text(
         f"""
         SELECT r.id AS snippet_id
@@ -63,6 +68,7 @@ def _fetch_pending(limit: int, recheck_candidates: bool = False) -> list[dict]:
           AND sq.dup_of IS NULL
           AND rt.snippet_id IS NULL
           {candidate_clause}
+          {expansion_clause}
         ORDER BY sq.info_value_score DESC NULLS LAST
         LIMIT :lim
         """
@@ -163,7 +169,8 @@ def _update_centroids() -> None:
 
 def run(threshold: float = DEFAULT_THRESHOLD, batch: int = 500,
         max_batches: int = 40, refresh_centroids: bool = True,
-        recheck_candidates: bool = False) -> tuple[int, int]:
+        recheck_candidates: bool = False,
+        expansion_only: bool = False) -> tuple[int, int]:
     themes = _load_theme_centroids()
     if not themes:
         log.error("themes_assign: no themes loaded. Run themes_seed first.")
@@ -173,7 +180,8 @@ def run(threshold: float = DEFAULT_THRESHOLD, batch: int = 500,
     log.info("themes_assign: %d themes loaded, threshold=%.2f, recheck_candidates=%s",
              len(themes), threshold, recheck_candidates)
     for i in range(max_batches):
-        rows = _fetch_pending(batch, recheck_candidates=recheck_candidates)
+        rows = _fetch_pending(batch, recheck_candidates=recheck_candidates,
+                              expansion_only=expansion_only)
         if not rows:
             break
         a, d = _batch_assign(rows, themes, threshold, coll)
@@ -195,8 +203,11 @@ if __name__ == "__main__":
     ap.add_argument("--no-refresh-centroids", action="store_true")
     ap.add_argument("--recheck-candidates", action="store_true",
                     help="Also re-try snippets currently in the candidate pool (use after lowering threshold or promoting new themes)")
+    ap.add_argument("--expansion-only", action="store_true",
+                    help="Restrict assignment universe to expansion-behavior snippets")
     ap.add_argument("--log-level", default="INFO")
     args = ap.parse_args()
     logging.basicConfig(level=args.log_level, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     run(args.threshold, args.batch, args.max_batches, not args.no_refresh_centroids,
-        recheck_candidates=args.recheck_candidates)
+        recheck_candidates=args.recheck_candidates,
+        expansion_only=args.expansion_only)

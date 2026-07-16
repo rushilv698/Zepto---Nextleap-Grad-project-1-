@@ -22,7 +22,8 @@ from .storage import engine
 
 log = logging.getLogger(__name__)
 
-TAXONOMY_VERSION = 1
+import os as _os
+TAXONOMY_VERSION = int(_os.environ.get("V2_TAXONOMY_VERSION", "1"))
 
 
 _PROMPT = """You are structuring a flat list of user-behavior themes for Zepto's

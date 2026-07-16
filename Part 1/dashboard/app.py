@@ -88,12 +88,23 @@ tab_v2, tab0, tab1, tab2, tab_v3, tab3, tab4 = st.tabs(
      "Trends", "Raw explorer"]
 )
 
+# Which taxonomy version to render in the v2 tab
+_V2_TAXONOMY_CHOICE = None  # set by radio inside tab_v2
+
 # ------------- v2 THEMES + VALIDATED INSIGHTS -----------------
 with tab_v2:
     st.markdown("### v2 pipeline — evolving taxonomy + multi-layer validated insights")
     st.caption("Per PDF methodology. Themes emerge dynamically (seed → grow → consolidate); "
                "each insight is scored on 5 automated validation layers + LLM critic; behavioural "
                "and business/experiment validation are honestly marked as gaps.")
+    tax_v = st.radio(
+        "Taxonomy version",
+        options=[1, 2],
+        format_func=lambda v: {1: "v2 (all keepers, 910 rows)", 2: "v2.1 (expansion-only, 546 rows)"}[v],
+        horizontal=True,
+        help="v2.1 is the focused rerun using ONLY snippets whose behaviour_flags describe "
+             "exploration / hesitation / decision-process — directly on the MAC-per-new-category goal.",
+    )
     try:
         with engine().begin() as conn:
             has_v2 = bool(conn.execute(text(
@@ -113,15 +124,16 @@ with tab_v2:
                 if not q.empty:
                     st.subheader("Filtration funnel")
                     st.dataframe(q, hide_index=True)
-                # Theme taxonomy summary
+                # Theme taxonomy summary — filtered by selected taxonomy version
                 th = pd.read_sql(text("""
                     SELECT t.id, t.name, t.definition, t.status, t.parent_id,
                            (SELECT name FROM themes p WHERE p.id = t.parent_id) AS parent_name,
-                           (SELECT COUNT(*) FROM review_themes rt WHERE rt.theme_id = t.id) AS members
+                           (SELECT COUNT(*) FROM review_themes rt WHERE rt.theme_id = t.id
+                              AND rt.taxonomy_version = :v) AS members
                     FROM themes t
-                    WHERE t.merged_into IS NULL
+                    WHERE t.merged_into IS NULL AND t.taxonomy_version = :v
                     ORDER BY parent_id NULLS FIRST, members DESC
-                """), conn)
+                """), conn, params={"v": int(tax_v)})
                 if not th.empty:
                     st.subheader(f"Taxonomy — {len(th)} themes (parents + leaves)")
                     st.dataframe(th[["id","name","status","parent_name","members","definition"]],
@@ -137,8 +149,9 @@ with tab_v2:
                            i.confidence_breakdown
                     FROM insights_v2 i
                     LEFT JOIN themes t ON t.id = i.theme_id
+                    WHERE i.taxonomy_version = :v
                     ORDER BY i.confidence DESC NULLS LAST
-                """), conn)
+                """), conn, params={"v": int(tax_v)})
                 if ins.empty:
                     st.info("No insights yet. `python -m pipeline.insights_generate`")
                 else:

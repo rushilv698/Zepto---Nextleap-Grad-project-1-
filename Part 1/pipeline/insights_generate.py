@@ -31,7 +31,8 @@ log = logging.getLogger(__name__)
 
 PROMPT_VERSION = "insights_generate_v1"
 _PROMPT = load_prompt("insights_generate_v1.txt")
-TAXONOMY_VERSION = 1
+import os as _os
+TAXONOMY_VERSION = int(_os.environ.get("V2_TAXONOMY_VERSION", "1"))
 MIN_MEMBERS = 8
 
 

@@ -32,7 +32,6 @@ PROMPT_VERSION = "themes_seed_v1"
 _PROMPT = load_prompt("themes_seed_v1.txt")
 
 SEED_MIN_SCORE = 50.0  # keep the top ~half of scored snippets
-TAXONOMY_VERSION = 1
 
 
 def _fetch_embedding(coll, snippet_id: str) -> list[float] | None:
@@ -49,9 +48,10 @@ def _fetch_embedding(coll, snippet_id: str) -> list[float] | None:
     return None
 
 
-def _sample(n: int, min_score: float) -> list[dict[str, Any]]:
+def _sample(n: int, min_score: float, expansion_only: bool = False) -> list[dict[str, Any]]:
+    expansion_clause = "AND sq.is_expansion_relevant = true" if expansion_only else ""
     q = text(
-        """
+        f"""
         SELECT r.id AS snippet_id, r.text, r.source, r.brand, sq.info_value_score
         FROM raw_snippets r
         JOIN snippet_quality sq ON sq.snippet_id = r.id
@@ -61,6 +61,7 @@ def _sample(n: int, min_score: float) -> list[dict[str, Any]]:
           AND sq.dup_of IS NULL
           AND sq.info_value_score >= :min_score
           AND length(r.text) BETWEEN 60 AND 1200
+          {expansion_clause}
         ORDER BY random()
         LIMIT :n
         """
@@ -94,7 +95,9 @@ def _sanitize_themes(raw: dict) -> list[dict]:
     return out
 
 
-def run(n: int = 200, min_score: float = SEED_MIN_SCORE, model: str = SYNTHESIZE_MODEL) -> int:
+def run(n: int = 200, min_score: float = SEED_MIN_SCORE, model: str = SYNTHESIZE_MODEL,
+        taxonomy_version: int = 1, expansion_only: bool = False, n_themes: int = 12) -> int:
+    TAXONOMY_VERSION = taxonomy_version
     # 1. Ensure taxonomy version exists
     with engine().begin() as conn:
         conn.execute(text(
@@ -102,7 +105,7 @@ def run(n: int = 200, min_score: float = SEED_MIN_SCORE, model: str = SYNTHESIZE
         ), {"v": TAXONOMY_VERSION})
 
     # 2. Sample high-info snippets
-    sample = _sample(n, min_score)
+    sample = _sample(n, min_score, expansion_only=expansion_only)
     if len(sample) < 20:
         log.warning("themes_seed: only %d snippets qualify (min_score=%.1f). Aborting.",
                     len(sample), min_score)
@@ -174,7 +177,12 @@ if __name__ == "__main__":
     ap.add_argument("--n", type=int, default=200)
     ap.add_argument("--min-score", type=float, default=SEED_MIN_SCORE)
     ap.add_argument("--model", default=SYNTHESIZE_MODEL)
+    ap.add_argument("--taxonomy-version", type=int, default=1)
+    ap.add_argument("--expansion-only", action="store_true",
+                    help="Only sample from snippets with expansion-related behaviour_flags")
     ap.add_argument("--log-level", default="INFO")
     args = ap.parse_args()
     logging.basicConfig(level=args.log_level, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
-    run(args.n, args.min_score, args.model)
+    run(args.n, args.min_score, args.model,
+        taxonomy_version=args.taxonomy_version,
+        expansion_only=args.expansion_only)
