@@ -82,9 +82,55 @@ with st.sidebar:
     except Exception as e:
         st.error(f"DB unavailable: {e}")
 
-tab1, tab2, tab3, tab4 = st.tabs(
-    ["Strategic Q&A", "Insight cards", "Trends", "Raw explorer"]
+tab0, tab1, tab2, tab_v3, tab3, tab4 = st.tabs(
+    ["Corpus hypotheses (reasoning)", "Strategic Q&A", "Insight cards (v1)", "Insight cards (v3, adversarial)", "Trends", "Raw explorer"]
 )
+
+# ------------- Corpus hypotheses (reasoning layer) --------------
+with tab0:
+    st.markdown("### Reasoning layer output — hypotheses inferred *across the whole corpus*")
+    st.caption("Different in kind from insight cards: this asked GPT-4.1 to reason about the corpus as a whole, including inferring signal from what's ABSENT.")
+    try:
+        with engine().begin() as conn:
+            top = conn.execute(text(
+                "SELECT DISTINCT top_line_read, what_this_corpus_cannot_answer, recommended_next_data_collection "
+                "FROM corpus_hypotheses ORDER BY 1 LIMIT 1"
+            )).first()
+            hyps = pd.read_sql(
+                text("SELECT rank, title, claim, reasoning, grounded_in, "
+                     "counter_evidence_that_would_disprove, confidence, novelty, "
+                     "implication_for_zepto, interview_probe "
+                     "FROM corpus_hypotheses ORDER BY rank"),
+                conn,
+            )
+        if top:
+            st.info(f"**Top-line read:** {top[0]}")
+        if hyps.empty:
+            st.warning("No corpus hypotheses yet. Run `python -m pipeline.reason`.")
+        else:
+            for _, h in hyps.iterrows():
+                emoji = {"high": "🟢", "medium": "🟡", "low": "🔴"}.get(h["confidence"], "⚪")
+                nov_tag = "✨ non-obvious" if h["novelty"] == "non_obvious" else "obvious"
+                with st.container(border=True):
+                    st.subheader(f"#{h['rank']}  ·  {h['title']}  ·  {emoji} {h['confidence']}  ·  {nov_tag}")
+                    st.markdown(f"**Claim:** {h['claim']}")
+                    st.markdown(f"**Reasoning:** {h['reasoning']}")
+                    gi = h["grounded_in"]
+                    if gi:
+                        try:
+                            items = gi if isinstance(gi, list) else json.loads(gi)
+                            st.markdown("**Grounded in:** " + " · ".join(f"`{x}`" for x in items))
+                        except Exception:
+                            pass
+                    st.markdown(f"**Counter-evidence that would disprove:** {h['counter_evidence_that_would_disprove']}")
+                    st.markdown(f"**Implication for Zepto:** {h['implication_for_zepto']}")
+                    st.markdown(f"**Interview probe:** _{h['interview_probe']}_")
+        if top:
+            with st.expander("Honest limits of this corpus"):
+                st.markdown(f"**Can't answer:** {top[1]}")
+                st.markdown(f"**Recommended next data:** {top[2]}")
+    except Exception as e:
+        st.error(f"Failed to load hypotheses: {e}")
 
 # ------------- Strategic Q&A -----------------
 STRATEGIC_QS = [
@@ -160,6 +206,65 @@ with tab2:
                     st.markdown(f"**Suggested experiment:** {r['suggested_experiment']}")
     except Exception as e:
         st.error(f"Failed to load: {e}")
+
+# ------------- Insight cards v3 (adversarial) --------------
+with tab_v3:
+    st.caption("Same clustering + hypothesis + counter-evidence + Part-2 interview probes. Use these cards to write your Part 2 interview scripts.")
+    try:
+        with engine().begin() as conn:
+            v3 = pd.read_sql(
+                text("SELECT id, title, hypothesis, detailed, persona_most_affected, primary_barrier, "
+                     "supporting_evidence, counter_evidence_check, confidence_in_hypothesis, "
+                     "suggested_experiment, part_2_interview_prompts, confidence, source_counts, "
+                     "brand_counts, discovery_breakdown, unique_authors "
+                     "FROM insight_cards_v3 ORDER BY confidence DESC"),
+                conn,
+            )
+        if v3.empty:
+            st.warning("No v3 cards. Run `python -m pipeline.synthesize_v3`.")
+        else:
+            conf_h = ["(any)"] + sorted(v3["confidence_in_hypothesis"].dropna().unique().tolist())
+            personas = ["(any)"] + sorted(v3["persona_most_affected"].dropna().unique().tolist())
+            barriers = ["(any)"] + sorted(v3["primary_barrier"].dropna().unique().tolist())
+            col1, col2, col3, col4 = st.columns(4)
+            with col1: c_h = st.selectbox("Model confidence", conf_h, key="v3_ch")
+            with col2: p3 = st.selectbox("Persona", personas, key="v3_p")
+            with col3: b3 = st.selectbox("Barrier", barriers, key="v3_b")
+            with col4: min_conf3 = st.slider("Min confidence score", 0, 100, 50, key="v3_mc")
+            f = v3[v3["confidence"] >= min_conf3]
+            if c_h != "(any)": f = f[f["confidence_in_hypothesis"] == c_h]
+            if p3 != "(any)": f = f[f["persona_most_affected"] == p3]
+            if b3 != "(any)": f = f[f["primary_barrier"] == b3]
+            st.write(f"**{len(f)} cards**")
+            for _, r in f.iterrows():
+                emoji = {"high": "🟢", "medium": "🟡", "low": "🔴"}.get(r["confidence_in_hypothesis"], "⚪")
+                with st.container(border=True):
+                    st.subheader(f"{r['title']}  ·  score {r['confidence']:.0f}  ·  {emoji} {r['confidence_in_hypothesis']}")
+                    st.markdown(f"**Hypothesis:** {r['hypothesis']}")
+                    st.write(r["detailed"])
+                    cols = st.columns(3)
+                    cols[0].markdown(f"**Persona**: {r['persona_most_affected']}")
+                    cols[1].markdown(f"**Barrier**: {r['primary_barrier']}")
+                    cols[2].markdown(f"**Unique authors**: {r['unique_authors']}")
+                    if r["brand_counts"]:
+                        bc = r["brand_counts"] if isinstance(r["brand_counts"], dict) else json.loads(r["brand_counts"])
+                        st.caption("Brands: " + " · ".join(f"{k}: {v}" for k, v in bc.items()))
+                    with st.expander("Supporting evidence"):
+                        st.write(r["supporting_evidence"])
+                    with st.expander("Counter-evidence check"):
+                        st.write(r["counter_evidence_check"])
+                    st.markdown(f"**Suggested experiment:** {r['suggested_experiment']}")
+                    prompts = r["part_2_interview_prompts"]
+                    if prompts:
+                        try:
+                            qs = prompts if isinstance(prompts, list) else json.loads(prompts)
+                            st.markdown("**Part-2 interview probes:**")
+                            for q in qs:
+                                st.markdown(f"- _{q}_")
+                        except Exception:
+                            pass
+    except Exception as e:
+        st.error(f"Failed to load v3 cards: {e}")
 
 # ------------- Trends -------------------------
 with tab3:
