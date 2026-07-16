@@ -41,11 +41,31 @@ reddit:
     - mumbai
     - bangalore
     - delhi
+    - hyderabad
+    - Chennai
+    - Kolkata
+    - pune
+    - gurgaon
+    - noida
     - IndiaInvestments
     - IndianFood
     - IndiaSpeaks
     - AskIndia
     - IndianStreetBets
+    - IndiaFinance
+    - StartUpIndia
+    - developersIndia
+    - librandu
+    - unitedstatesofindia
+    - urbanindia
+    - IndianTeenagers
+    - college
+    - Chandigarh
+    - IndianStartups
+    - askIndia
+    - IndianFashionAddicts
+    - CasualIndia
+    - IndianAcademia
   # Brand-focused search — Zepto/competitors named directly
   search_terms:
     - Zepto
@@ -70,6 +90,21 @@ reddit:
     - "grocery delivery experience"
     - "grocery app comparison"
     - "instant delivery grocery"
+    - "dark stores india"
+    - "quick commerce experience"
+    - "grocery subscription"
+    - "personal care online delivery"
+    - "pet food india online"
+    - "baby products online india"
+    - "beauty products delivery"
+    - "monthly essentials app"
+    - "10 min delivery experience"
+    - "grocery shopping urban india"
+    - "dhaba vs zomato"
+    - "kirana store loyalty"
+    - "family grocery decisions"
+    - "diwali shopping online"
+    - "who delivers fastest india"
 
 # Curated YouTube videos with rich comment sections about Zepto / quick commerce.
 # Mix of official Zepto ads, comparison reviews, and finance/business breakdowns.
@@ -94,6 +129,81 @@ youtube_videos:
   - id: eyaQ1zeqNeY    # Amazon 10-Min Delivery — 38K views
   - id: bQRDKgreM4I    # Darkside of 10-minute delivery — 22K views
   - id: F2jsNYPqaIg    # Q-Comm unit economics future — 23K views
+  # More Zepto product/consumer content
+  - id: LoScLkn6oDE    # Zepto haul home workout
+  - id: LW9AGm4AXig    # Random grocery haul Zepto scams
+  - id: Zb326TlbioE    # 10000 zero sugar Zepto haul
+  - id: vhJEu9jS2hI    # Zepto Grocery Unboxing 7 min
+  - id: ADUNfMzINu4    # Budget Friendly Zepto haul
+  - id: 3VaqnQ_hXg0    # Quick Zepto Grocery Haul
+  - id: J-OD3gYrr2Y    # ZEPTO MAKEUP HAUL under 1600
+  - id: iWKtv-KZYDM    # Buy 300 pay 200 Zepto trending
+  - id: xhTVmPzCeZg    # Zepto Grocery Haul 200 for 300
+  - id: oeBGdqWDLTo    # Zepto Shopping Haul haulvideo
+  - id: Z9uG1sz-v2Y    # Zepto Se Itna Sasta Grocery Haul
+  # Founder / business context (rich for mental-model signals in comments)
+  - id: _d9lQuaZVT4    # Modinomics FM Sitharaman Palicha
+  - id: AZeb0cy3U6Q    # Launching Zepto Atom
+  - id: 2Jc-IeAoVk0    # Aadit Palicha Young Turk Startup
+  - id: rcif_dkplrQ    # Zepto CEO on AI IPO 10-min deliveries
+  # Meta ecosystem
+  - id: jLO_ULZOAOA    # Amazon plan quick commerce entering late
+  - id: oYxgCTpISnc    # How to sell on Blinkit no ads
+  - id: 8zBUTla1f54    # Q-commerce battle Daily Brief Hindi
+  - id: IiKg0l1XHHk    # 250M business opposite quick commerce
+
+# News + business-blog articles with rich comment / discussion sections about
+# Zepto and Indian quick commerce. The scraper pulls the article body (as
+# context) + the comments section. Most Indian business media use Disqus,
+# Facebook Comments, or native Vue/React comment widgets — the scraper handles
+# raw HTML text extraction; where JS-rendered comments exist, we still capture
+# the article text which itself contains reader mentality signal.
+# We do NOT hardcode article URLs (they rot and are unpredictable). Instead
+# the news scraper uses Google News RSS to discover real article URLs at run
+# time for each query below, then scrapes each URL's paragraphs + comments.
+news_queries:
+  - "Zepto quick commerce"
+  - "Zepto grocery delivery"
+  - "Zepto vs Blinkit"
+  - "Zepto vs Swiggy Instamart"
+  - "Aadit Palicha Zepto"
+  - "10 minute delivery India"
+  - "quick commerce India profit"
+  - "dark stores India"
+  - "quick commerce user retention"
+  - "Zepto app review"
+  - "Zepto Cafe"
+  - "Zepto Atom"
+
+# Domains we prefer (others get lower priority / dropped)
+news_preferred_domains:
+  - inc42.com
+  - yourstory.com
+  - economictimes.indiatimes.com
+  - livemint.com
+  - moneycontrol.com
+  - theken.com
+  - business-standard.com
+  - thehindu.com
+  - hindustantimes.com
+  - forbesindia.com
+  - reuters.com
+  - businesstoday.in
+  - financialexpress.com
+  - entrackr.com
+  - the-ken.com
+  - livehindustan.com
+  - news18.com
+  - firstpost.com
+  - scroll.in
+  - thewire.in
+  - ndtvprofit.com
+  - thehindubusinessline.com
+  - ndtv.com
+  - indianexpress.com
+  - deccanherald.com
+  - business-standard.com
+  - mint.com
 
 twitter:
   search_terms:

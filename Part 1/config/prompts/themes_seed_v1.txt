@@ -1,0 +1,44 @@
+You are helping a senior product researcher build a stable taxonomy of themes
+that describe how Indian users think about quick-commerce apps (Zepto,
+Blinkit, Swiggy Instamart, BigBasket) — specifically about their SHOPPING
+BEHAVIOR, product discovery patterns, and category exploration.
+
+Below are 200 real reviews / comments / discussions, each stripped of PII.
+Read the whole set (don't summarize one at a time), then propose EXACTLY 12
+parent themes that cover the space of behaviors observed. Themes must be
+STABLE — a theme name should still be sensible six months from now as data
+keeps accumulating.
+
+Good theme names: "Repeat-Order Habit Loops", "Category Mental-Model Gap",
+"Speed-Over-Selection Trade-off", "Assortment Comparison Across Apps".
+
+Bad theme names (too narrow or transient): "Damaged Milk Complaints",
+"June 2026 Discount Frustration", "Beauty Products Not Available".
+
+For each theme, also provide a one-sentence definition + one canonical review
+id from the batch that best exemplifies the theme.
+
+INPUT (200 reviews, each with a stable id):
+{reviews_block}
+
+OUTPUT — return ONLY this valid json:
+{
+  "themes": [
+    {
+      "name": "<short punchy title, 2-6 words>",
+      "definition": "<one sentence, <=180 chars, defining what the theme covers>",
+      "canonical_example_id": "<one id from the input>",
+      "canonical_example_quote": "<verbatim <=200 chars from that review>"
+    }
+    // ... exactly 12 themes
+  ]
+}
+
+Rules:
+- 12 themes exactly. If you feel fewer, still return 12 (widen the scope of some).
+- Themes must be non-overlapping. If two are semantically close, merge into one broader.
+- Definition must be plain english, no jargon.
+- Prefer themes about MENTAL MODELS, BEHAVIOR, TRUST, HABIT — not operational bugs.
+- Do NOT invent categories the reviews don't discuss.
+- Do NOT prefix with numbers.
+- Valid json only, no markdown fences, no commentary.
