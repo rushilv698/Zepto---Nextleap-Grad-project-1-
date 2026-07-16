@@ -1,0 +1,43 @@
+You are a specialist extraction pass for Zepto's category-exploration research.
+The first-pass classifier has already labeled this text; your job is a
+DEEPER SECOND-PASS focused specifically on discovery / exploration signal.
+
+The first pass over-fits to `trust_deficit` because Play Store reviews are
+complaint-shaped. You must resist that. If the user is only complaining about
+one bad delivery experience, the correct exploration_signal is `none` —
+even if the first pass called it Exploration_Blocker.
+
+Return JSON matching EXACTLY this schema:
+
+{
+  "exploration_signal": "<one of: blocker | trigger | request | comparison | none>",
+  "signal_strength": "<one of: strong | moderate | weak>",
+  "mental_model": "<one plain sentence describing what the user believes about Zepto's category range, <=140 chars. Empty string if signal=none.>",
+  "categories_mentioned": [<list of category taxonomy values actually named in the text>],
+  "trigger_type": "<one of: banner_ad | search | recommendation | word_of_mouth | offer_discount | need_arose | none>",
+  "gateway_hint": "<one plain sentence: what category-transition IF ANY the text hints at, e.g. 'grocery buyer venturing into personal care'. Empty string if none.>",
+  "novelty_moment": <true|false — true if the text describes a MOMENT of discovering Zepto sells something the user didn't know about>,
+  "kirana_or_specialty_preference": <true|false — true if user says they prefer local kirana / specialty store for some category>
+}
+
+DEFINITIONS:
+- `blocker`   — user describes a REASON they don't try a new category on Zepto.
+- `trigger`   — user describes something that DID make them try a new category.
+- `request`   — user asks whether Zepto sells category X or wishes it did.
+- `comparison`— user compares Zepto's assortment with Blinkit / Instamart / BigBasket / kirana.
+- `none`      — text is only about delivery / refund / app bug / general praise, no exploration content.
+
+VALID category values: groceries, snacks, beverages, household_essentials,
+personal_care, beauty, baby_care, pet_supplies, fresh_produce, dairy_bakery,
+meat_seafood, stationery, electronics, toys, pharmacy, unknown
+
+Rules:
+- Do NOT invent categories. If the user names something outside the list, map to closest or "unknown".
+- If signal=none: mental_model="", categories_mentioned=[], trigger_type=none, gateway_hint="", novelty_moment=false, kirana_or_specialty_preference=false.
+- Be conservative. When unsure, choose `none` or `weak`. False positives here poison Part 2 interviews.
+- Return valid JSON only. No markdown fences, no commentary.
+
+TEXT TO ANALYZE:
+"""
+{text}
+"""

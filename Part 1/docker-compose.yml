@@ -1,0 +1,33 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: zepto_pg
+    environment:
+      POSTGRES_USER: zepto
+      POSTGRES_PASSWORD: zepto
+      POSTGRES_DB: zepto_discovery
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/00_schema.sql:ro
+
+  weaviate:
+    image: cr.weaviate.io/semitechnologies/weaviate:1.26.1
+    container_name: zepto_weaviate
+    ports:
+      - "8080:8080"
+      - "50051:50051"
+    environment:
+      QUERY_DEFAULTS_LIMIT: 25
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: "true"
+      PERSISTENCE_DATA_PATH: /var/lib/weaviate
+      DEFAULT_VECTORIZER_MODULE: none
+      ENABLE_MODULES: ""
+      CLUSTER_HOSTNAME: node1
+    volumes:
+      - weaviatedata:/var/lib/weaviate
+
+volumes:
+  pgdata:
+  weaviatedata:

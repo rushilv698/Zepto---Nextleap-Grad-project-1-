@@ -1,0 +1,38 @@
+# === SECRETS — NEVER COMMIT ===
+**/.env
+**/.env.local
+**/*.env
+**/secrets.toml
+**/credentials.json
+
+# === Python ===
+**/__pycache__/
+**/*.pyc
+**/.pytest_cache/
+**/.ipynb_checkpoints/
+**/.venv/
+**/venv/
+**/.mypy_cache/
+**/.ruff_cache/
+
+# === Data lake — heavy, regenerable ===
+**/data_lake/
+**/*.parquet
+**/*.db
+**/*.sqlite
+**/*.sqlite3
+
+# === Streamlit local secrets ===
+**/.streamlit/secrets.toml
+
+# === OS / editor ===
+.DS_Store
+**/.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# === Docker volumes / logs ===
+**/pgdata/
+**/weaviatedata/
+**/*.log

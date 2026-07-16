@@ -1,0 +1,161 @@
+brand: Zepto
+
+app_ids:
+  play_store: com.zeptoconsumerapp
+  app_store:
+    name: zepto-groceries-in-minutes
+    id: 1575323645
+
+# Competitor Play Store IDs — pulled as CONTROL group. Same barriers appearing
+# across competitors → industry-wide problem. Barriers unique to Zepto →
+# Zepto-specific opportunity.
+competitor_play_store_ids:
+  - id: com.grofers.customerapp
+    brand: blinkit
+  - id: com.bigbasket.mobileapp
+    brand: bigbasket
+  - id: in.swiggy.consumer
+    brand: swiggy_instamart
+
+# OPTIONAL: Zepto product-catalog scrapers seen in the Apify store. Using one
+# of these gives us a "what Zepto actually sells" ground-truth table we can
+# join against Unmet_Need signals — i.e. if 100 users ask "do you have pet
+# food?" and the catalog says Zepto *does* carry it, that's a discovery UI
+# problem, not an assortment gap. Wire in later if time permits.
+zepto_catalog_actors_optional:
+  - id: shahidirfan/zepto-product-scraper
+    note: 5.0★ (4 reviews), 85 users
+  - id: krazee_kaushik/zepto-scraper
+    note: 5.0★, 120 users
+  - id: smacient/zepto-data-extractor
+    note: 45 users
+  - id: archittjn/zepto-search-scraper
+    note: "$0.9/1k, keyword-driven search"
+  - id: archittjn/zepto-category-scraper
+    note: "$0.9/1k, category-page listings"
+
+reddit:
+  subreddits:
+    - Zepto
+    - india
+    - mumbai
+    - bangalore
+    - delhi
+    - IndiaInvestments
+    - IndianFood
+    - IndiaSpeaks
+    - AskIndia
+    - IndianStreetBets
+  # Brand-focused search — Zepto/competitors named directly
+  search_terms:
+    - Zepto
+    - ZeptoNow
+    - "Zepto app"
+    - "Zepto order"
+    - "Zepto delivery"
+    - "Zepto vs Blinkit"
+    - "Zepto vs Instamart"
+    - "Zepto categories"
+  # Deep-context search — no brand names; catches organic discussion of
+  # habits, kirana loyalty, quick-commerce mental models, category exploration.
+  # Post-hoc keyword filter will keep only those mentioning at least one QC brand.
+  deep_search_terms:
+    - "quick commerce india"
+    - "10 minute delivery india"
+    - "grocery app india"
+    - "kirana vs online"
+    - "grocery habits"
+    - "monthly grocery shopping"
+    - "online grocery"
+    - "grocery delivery experience"
+    - "grocery app comparison"
+    - "instant delivery grocery"
+
+# Curated YouTube videos with rich comment sections about Zepto / quick commerce.
+# Mix of official Zepto ads, comparison reviews, and finance/business breakdowns.
+# Comment threads on these have thousands of first-person accounts of category
+# exploration mental models.
+youtube_videos:
+  # Blockbuster Zepto content
+  - id: _TgMvdc3pyQ    # We ordered entire ZEPTO CAFE Menu — 3.3M views
+  - id: nGpir4oUfJI    # WTF podcast — Aadit Palicha — 2.9M views
+  - id: 7SC5w0Q7bzM    # LaunchX Application Video — Aadit Palicha — 291K views
+  - id: Ye5z_nSyW9M    # Zepto Founders story — 225K views
+  - id: YKZCU0ynEbs    # Zepto Two 17-Year-Olds — 166K views
+  - id: fAR1GLGFQJ0    # Stanford dropout Aadit 60000 crore — 142K views
+  - id: aYK0H85E_oU    # How Zepto Became India's Fastest Growing — 231K views
+  - id: Drt-BwceCxc    # Rapid Fire with Aadit Palicha — 55K views
+  # Quick-commerce ecosystem / comparison / critique
+  - id: GuPT-BDzsHU    # Will Quick Commerce Be Profitable — 149K views
+  - id: vC0p8AHIvKQ    # Quick Commerce CAN'T SURVIVE — 121K views
+  - id: 5zGXUB1Il6A    # Honest Opinion On Quick Commerce — 98K views
+  - id: VqYhU6eKNCc    # Shocking Report on QC — 96K views
+  - id: stxIs3MdYRs    # Cost Breakdown of Quick Commerce — 92K views
+  - id: eyaQ1zeqNeY    # Amazon 10-Min Delivery — 38K views
+  - id: bQRDKgreM4I    # Darkside of 10-minute delivery — 22K views
+  - id: F2jsNYPqaIg    # Q-Comm unit economics future — 23K views
+
+twitter:
+  search_terms:
+    - Zepto
+    - "@ZeptoNow"
+    - "zepto delivery"
+    - "zepto app"
+    - "zepto categories"
+  handles:
+    - ZeptoNow
+    - aadit_palicha
+    - kaivalyavohra
+
+# Tier-1 keyword pre-filter — only snippets containing at least one of these
+# survive into the LLM classification tier. Keep this list broad; the LLM narrows.
+relevance_keywords:
+  # exploration / discovery signals
+  - "only buy"
+  - "only order"
+  - "same items"
+  - "same stuff"
+  - "same things"
+  - "never tried"
+  - "never bought"
+  - "new categor"
+  - "new section"
+  - "wish they had"
+  - "wish they sold"
+  - "wish zepto"
+  - "do you have"
+  - "do you sell"
+  - "cant find"
+  - "can't find"
+  - "couldn't find"
+  - "discover"
+  - "explore"
+  - "browse"
+  - "other products"
+  - "different products"
+  - "categor"
+  - "personal care"
+  - "beauty"
+  - "makeup"
+  - "pet"
+  - "baby"
+  - "snacks"
+  - "grocer"
+  - "household"
+  - "detergent"
+  - "kirana"
+  - "recommend"
+  - "suggest"
+  - "variety"
+  - "selection"
+  - "range"
+  - "assortment"
+
+# Operational-only complaints to *deprioritize* unless combined with a discovery keyword
+noise_keywords:
+  - "late delivery"
+  - "delivery late"
+  - "refund"
+  - "app crash"
+  - "not loading"
+  - "coupon not working"

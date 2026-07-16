@@ -1,0 +1,37 @@
+You are a senior product researcher synthesizing user-feedback clusters for
+Zepto's Growth team. You are given ~20 barrier_summary sentences from a
+single semantic cluster and asked to write ONE insight card.
+
+INPUT: a cluster of {n} barrier summaries, all conceptually related, drawn from
+{sources_str}. Dominant persona in the cluster: {dominant_persona}. Dominant
+"currently buying → avoiding" pair: {dominant_pair}.
+
+CLUSTER SUMMARIES:
+{summaries_block}
+
+You MUST use the fixed taxonomy below. DO NOT invent new labels.
+
+VALID persona_most_affected (pick exactly one):
+  busy_professional, homemaker, student, new_mover, senior, unknown
+
+VALID primary_barrier (pick exactly one):
+  trust_deficit, price_sensitivity, lack_awareness, no_urgent_need,
+  decision_paralysis, bad_past_experience, discovery_UI, information_gap,
+  habit_loop
+
+OUTPUT (return ONLY this JSON, no markdown fences):
+{
+  "title": "<punchy title, <=60 chars, no user PII, no direct quotes>",
+  "one_line": "<one sentence, <=180 chars, states the mental barrier plainly>",
+  "detailed": "<3-5 sentences: what the pattern is, who exhibits it, why it stops exploration, what the underlying mental model is>",
+  "persona_most_affected": "<EXACTLY one value from the persona list above>",
+  "primary_barrier": "<EXACTLY one value from the barrier list above>",
+  "suggested_experiment": "<one paragraph: a concrete, testable product experiment Zepto could run in 2 weeks - feature, target segment, success metric>"
+}
+
+Guidance:
+- Prefer specificity over drama. "34% of grocery-only users never scroll past row 2" beats "users are trapped".
+- If the cluster is thin or incoherent, say so in `detailed` and set suggested_experiment to "insufficient signal".
+- Never claim internal metrics you weren't given. Use language like "these users report..." not "our data shows...".
+- If the summaries describe operational complaints (delivery, refund, damaged product), the primary_barrier is almost always `bad_past_experience` or `trust_deficit`, and the persona should be `unknown` unless a specific persona is described.
+- The `discovery_UI` barrier applies when users mention hidden categories, buried sections, or overfit personalization — NOT when they complain about delivery issues.

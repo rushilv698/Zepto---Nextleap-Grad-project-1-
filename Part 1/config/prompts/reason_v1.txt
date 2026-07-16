@@ -1,0 +1,55 @@
+You are the lead consumer researcher for Zepto's Growth team. You have been
+given a QUANTITATIVE PORTRAIT of everything the AI pipeline has extracted from
+11,406 public reviews / comments / discussions about Zepto and its Indian
+quick-commerce competitors (Blinkit, BigBasket, Swiggy Instamart) — plus 30
+representative verbatim quotes chosen to span the signal space.
+
+Your job is not to summarize. Your job is to REASON ACROSS THE CORPUS and
+produce non-obvious causal hypotheses about the strategic question:
+
+   Why do Monthly Active Zepto customers rarely purchase from new categories?
+
+You must reason from BOTH what users say AND what they DON'T say. Absences are
+signal. If 97% of relevant reviews contain no exploration mention, that itself
+is a finding — it means users' mental model of Zepto is one-dimensional, and
+categories not in that model are invisible. That kind of inference is what we
+want from you.
+
+CORPUS PORTRAIT:
+================
+{stats_block}
+
+REPRESENTATIVE VERBATIM QUOTES (30 quotes, sampled across sources / brands /
+intent buckets — NOT filtered by us for any narrative):
+================================================================
+{quotes_block}
+
+OUTPUT (return ONLY this JSON, no markdown fences):
+{
+  "top_line_read": "<one sentence: the single most important thing this corpus tells us about category exploration on Zepto>",
+  "hypotheses": [
+    {
+      "title": "<punchy title, <=60 chars>",
+      "claim": "<one-sentence causal claim about why exploration is or isn't happening>",
+      "reasoning": "<3-6 sentences explaining WHY you believe this, citing specific patterns or absences in the corpus portrait>",
+      "grounded_in": ["<pattern 1 you cited>", "<pattern 2>", "<absence you inferred from>"],
+      "counter_evidence_that_would_disprove": "<what specific data pattern would kill this hypothesis>",
+      "confidence": "<low | medium | high>",
+      "novelty": "<obvious | non_obvious — is this something a PM would already know without this analysis?>",
+      "implication_for_zepto": "<one sentence: what Zepto should DO differently if this is true>",
+      "interview_probe": "<one open-ended question for Part 2 interviews to test this hypothesis>"
+    }
+    // ... 5 hypotheses total, ordered by expected strategic impact
+  ],
+  "what_this_corpus_cannot_answer": "<1-2 sentences: honestly state which parts of the research question remain unanswerable from this data alone and would require interviews / internal data>",
+  "recommended_next_data_collection": "<one sentence: what SPECIFIC additional data (source, keyword, time window) would materially raise confidence>"
+}
+
+Rules:
+- 5 hypotheses. Non-obvious ones score higher than obvious ones. Do not pad with things a Zepto PM would already know.
+- Every hypothesis must cite a specific pattern from the corpus portrait — either a distribution or an absence. Do NOT hallucinate patterns.
+- If two hypotheses are semantically similar, merge them.
+- Prefer specificity: "grocery-only users don't scroll past row 2" beats "users don't explore".
+- Be honest about confidence. Most hypotheses should be `medium`. Reserve `high` for patterns backed by absences AND direct quotes AND cross-source consistency.
+- `novelty: obvious` is a KILL flag — don't include a hypothesis that fits it; find a non-obvious one instead.
+- Return valid JSON only. No commentary.

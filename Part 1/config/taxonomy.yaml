@@ -1,0 +1,69 @@
+# Fixed vocabulary the LLM must map to. Do NOT let the LLM invent new labels ---
+# every downstream aggregation (clustering, confidence scoring, dashboards)
+# depends on these being stable.
+
+intent_classes:
+  - name: Exploration_Blocker
+    description: User explicitly or implicitly describes something stopping them from trying a new category on Zepto.
+  - name: Repeat_Purchase_Habit
+    description: User describes a habitual reorder loop (same list, same items, "I just tap repeat").
+  - name: Discovery_Request
+    description: User asks whether Zepto sells a particular category or product.
+  - name: Unmet_Need
+    description: User wants a category or product Zepto does not currently carry.
+  - name: Irrelevant
+    description: Anything else — operational complaints, praise without exploration signal, spam.
+
+barriers:
+  - name: trust_deficit
+    description: User doesn't trust product quality/authenticity in the new category.
+  - name: price_sensitivity
+    description: User perceives new category is overpriced vs alternatives (kirana, D-Mart, specialty stores).
+  - name: lack_awareness
+    description: User simply doesn't know Zepto carries the category.
+  - name: no_urgent_need
+    description: User's demand for the category is not urgent enough for 10-min delivery.
+  - name: decision_paralysis
+    description: Too many options, no clear comparison, user gives up.
+  - name: bad_past_experience
+    description: Tried once, had a bad experience, won't try again.
+  - name: discovery_UI
+    description: App UI buries the category — personalized recommendations over-fit to routine.
+  - name: information_gap
+    description: User wants specs, reviews, ingredients, comparisons before buying.
+  - name: habit_loop
+    description: Behavioral inertia — "I just open and tap repeat".
+
+personas:
+  - busy_professional
+  - homemaker
+  - student
+  - new_mover
+  - senior
+  - unknown
+
+emotional_tones:
+  - frustration
+  - contentment
+  - indifference
+  - curiosity
+  - anger
+
+categories:
+  # Zepto's known categories (used both as "currently_buying" and "avoiding")
+  - groceries
+  - snacks
+  - beverages
+  - household_essentials
+  - personal_care
+  - beauty
+  - baby_care
+  - pet_supplies
+  - fresh_produce
+  - dairy_bakery
+  - meat_seafood
+  - stationery
+  - electronics
+  - toys
+  - pharmacy
+  - unknown
