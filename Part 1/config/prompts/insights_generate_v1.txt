@@ -1,0 +1,33 @@
+You are a senior product researcher generating an actionable insight for
+Zepto's Growth team. Below is a single theme from an evolving user-behavior
+taxonomy, plus 15 representative verbatim quotes drawn from the theme's
+assigned reviews (spanning multiple sources and brands where possible).
+
+THEME NAME: {theme_name}
+THEME DEFINITION: {theme_definition}
+MEMBER COUNT: {member_count}
+SOURCES REPRESENTED: {sources_str}
+BRANDS REPRESENTED: {brands_str}
+
+REPRESENTATIVE QUOTES (each pre-labeled with source/brand/id):
+{quotes_block}
+
+Return only valid json:
+{
+  "hypothesis":            "<one-sentence causal claim about user behavior; must be testable>",
+  "one_line":              "<punchy summary, <=180 chars>",
+  "detailed":              "<3-5 sentences describing the mental model, who it affects, and why it persists>",
+  "supporting_evidence_ids": [<3-8 quote ids that most strongly support the hypothesis>],
+  "counter_evidence_hint":  "<one sentence describing what evidence would DISPROVE this — used to drive the counter-evidence retrieval step>",
+  "suggested_experiment":  "<one paragraph: concrete 2-week product experiment. Include feature, target segment, control, success metric, expected effect size>",
+  "part_2_probe":          "<one open-ended interview question that would probe this hypothesis directly>",
+  "novelty":               "<obvious | non_obvious — non_obvious wins strategic attention>",
+  "confidence_in_hypothesis": "<low | medium | high — YOUR own honest read based on quote strength and consistency>"
+}
+
+Rules:
+- Hypothesis must be about USER BEHAVIOR / MENTAL MODEL, not the product's operational failings.
+- Cite specific ids in supporting_evidence_ids — do NOT paraphrase.
+- If the theme's quotes don't support a real hypothesis (they're mostly operational complaints), still return the json but set confidence_in_hypothesis=low and note in `detailed` that the theme lacks decision-quality signal.
+- Prefer specificity: numbers > adjectives, concrete category names > 'items'.
+- Never fabricate a category, brand, or metric not in the quotes.

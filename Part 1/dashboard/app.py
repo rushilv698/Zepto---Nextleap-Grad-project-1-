@@ -82,9 +82,101 @@ with st.sidebar:
     except Exception as e:
         st.error(f"DB unavailable: {e}")
 
-tab0, tab1, tab2, tab_v3, tab3, tab4 = st.tabs(
-    ["Corpus hypotheses (reasoning)", "Strategic Q&A", "Insight cards (v1)", "Insight cards (v3, adversarial)", "Trends", "Raw explorer"]
+tab_v2, tab0, tab1, tab2, tab_v3, tab3, tab4 = st.tabs(
+    ["v2 Themes + Insights (validated)", "Corpus hypotheses (reasoning)",
+     "Strategic Q&A", "Insight cards (v1)", "Insight cards (v3, adversarial)",
+     "Trends", "Raw explorer"]
 )
+
+# ------------- v2 THEMES + VALIDATED INSIGHTS -----------------
+with tab_v2:
+    st.markdown("### v2 pipeline — evolving taxonomy + multi-layer validated insights")
+    st.caption("Per PDF methodology. Themes emerge dynamically (seed → grow → consolidate); "
+               "each insight is scored on 5 automated validation layers + LLM critic; behavioural "
+               "and business/experiment validation are honestly marked as gaps.")
+    try:
+        with engine().begin() as conn:
+            has_v2 = bool(conn.execute(text(
+                "SELECT 1 FROM information_schema.tables WHERE table_name='insights_v2'"
+            )).first())
+            if not has_v2:
+                st.info("v2 pipeline not yet run. `python -m pipeline.themes_seed` etc.")
+            else:
+                # Corpus health
+                q = pd.read_sql(text("""
+                    SELECT COALESCE(is_spam::text,'null') AS is_spam,
+                           COALESCE(is_relevant::text,'null') AS is_relevant,
+                           CASE WHEN dup_of IS NOT NULL THEN 'dup' ELSE 'unique' END AS dedup,
+                           COUNT(*) AS n
+                    FROM snippet_quality GROUP BY 1,2,3 ORDER BY 4 DESC
+                """), conn)
+                if not q.empty:
+                    st.subheader("Filtration funnel")
+                    st.dataframe(q, hide_index=True)
+                # Theme taxonomy summary
+                th = pd.read_sql(text("""
+                    SELECT t.id, t.name, t.definition, t.status, t.parent_id,
+                           (SELECT name FROM themes p WHERE p.id = t.parent_id) AS parent_name,
+                           (SELECT COUNT(*) FROM review_themes rt WHERE rt.theme_id = t.id) AS members
+                    FROM themes t
+                    WHERE t.merged_into IS NULL
+                    ORDER BY parent_id NULLS FIRST, members DESC
+                """), conn)
+                if not th.empty:
+                    st.subheader(f"Taxonomy — {len(th)} themes (parents + leaves)")
+                    st.dataframe(th[["id","name","status","parent_name","members","definition"]],
+                                 hide_index=True, use_container_width=True)
+                else:
+                    st.info("No themes yet. `python -m pipeline.themes_seed`")
+                # Insights, ranked by confidence
+                ins = pd.read_sql(text("""
+                    SELECT i.id, i.theme_id, t.name AS theme,
+                           i.hypothesis, i.one_line, i.detailed,
+                           i.suggested_experiment, i.part_2_probe,
+                           i.confidence, i.validation_status, i.critic_verdict, i.critic_notes,
+                           i.confidence_breakdown
+                    FROM insights_v2 i
+                    LEFT JOIN themes t ON t.id = i.theme_id
+                    ORDER BY i.confidence DESC NULLS LAST
+                """), conn)
+                if ins.empty:
+                    st.info("No insights yet. `python -m pipeline.insights_generate`")
+                else:
+                    st.subheader(f"Insights — {len(ins)} generated")
+                    statuses = ["(any)"] + sorted(ins["validation_status"].dropna().unique().tolist())
+                    verdicts = ["(any)"] + sorted(ins["critic_verdict"].dropna().unique().tolist())
+                    col1, col2, col3 = st.columns(3)
+                    with col1: st_pick = st.selectbox("Status", statuses, key="v2_status")
+                    with col2: v_pick = st.selectbox("Critic verdict", verdicts, key="v2_verdict")
+                    with col3: min_c = st.slider("Min confidence", 0, 100, 40, key="v2_conf")
+                    f = ins[ins["confidence"].fillna(0) >= min_c]
+                    if st_pick != "(any)": f = f[f["validation_status"] == st_pick]
+                    if v_pick != "(any)": f = f[f["critic_verdict"] == v_pick]
+                    for _, r in f.iterrows():
+                        badge = {"confirmed":"🟢 confirmed","exploratory":"🟡 exploratory","shelved":"🔴 shelved","revising":"🟠 revising"}.get(r["validation_status"], r["validation_status"])
+                        with st.container(border=True):
+                            st.subheader(f"{r['theme']}  ·  conf {r['confidence']:.0f}  ·  {badge}")
+                            st.markdown(f"**Hypothesis:** {r['hypothesis']}")
+                            if r["one_line"]:
+                                st.markdown(f"_{r['one_line']}_")
+                            st.write(r["detailed"])
+                            if r["suggested_experiment"]:
+                                st.markdown(f"**Experiment:** {r['suggested_experiment']}")
+                            if r["part_2_probe"]:
+                                st.markdown(f"**Interview probe:** {r['part_2_probe']}")
+                            if r["critic_notes"]:
+                                with st.expander(f"LLM critic verdict: {r['critic_verdict']}"):
+                                    st.write(r["critic_notes"])
+                            bd = r["confidence_breakdown"]
+                            if bd:
+                                try:
+                                    b = bd if isinstance(bd, dict) else json.loads(bd)
+                                    with st.expander("Validation breakdown"):
+                                        st.json(b)
+                                except Exception:
+                                    pass
+    except Exception as e:
+        st.error(f"v2 tab failed: {e}")
 
 # ------------- Corpus hypotheses (reasoning layer) --------------
 with tab0:
