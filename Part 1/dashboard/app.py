@@ -661,9 +661,48 @@ the Dashboard.
     if not insights:
         st.warning("No evidence-linked insights yet.")
     else:
-        st.metric("Total generated", len(insights))
+        # Themes → insights funnel: not every theme gets an insight.
+        try:
+            th = load_themes(PRIMARY_TAX_V)
+            leaf = th[th["parent_id"].notna()] if not th.empty else pd.DataFrame()
+            n_parents = int(th["parent_id"].isna().sum()) if not th.empty else 0
+            n_leaves = int(len(leaf))
+            MIN_MEMBERS_FOR_INSIGHT = 5
+            n_eligible = int((leaf["members"] >= MIN_MEMBERS_FOR_INSIGHT).sum()) if not leaf.empty else 0
+            n_thin = n_leaves - n_eligible
+        except Exception:
+            n_parents = n_leaves = n_eligible = n_thin = 0
+
+        st.markdown("#### From themes to insights")
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Themes total", n_parents + n_leaves,
+                  help="Parent buckets + leaf themes combined (see Themes tab).")
+        c2.metric("Parent buckets", n_parents, delta="0 direct members", delta_color="off",
+                  help="Organizing shelves — their children carry the reviews.")
+        c3.metric(f"Leaf themes with ≥ 5 reviews", n_eligible,
+                  help="Only leaf themes with enough supporting reviews qualify for insight generation.")
+        c4.metric("Insights generated", len(insights),
+                  help="One insight per eligible leaf theme.")
+
+        with st.expander("Why don't ALL themes get an insight?", expanded=False):
+            st.markdown(f"""
+The engine generates **one insight per leaf theme**, but only when the theme has
+**at least 5 supporting reviews**. This threshold exists to avoid fabricated-sounding
+claims — a hypothesis inferred from 1 or 2 quotes is speculation, not signal.
+
+Of the {n_parents + n_leaves} themes shown in the Themes tab:
+- **{n_parents}** are *parent buckets* — organizing shelves with no direct member reviews.
+  Their children (leaf themes) carry the reviews. Parents don't get their own insights.
+- **{n_thin}** are *leaf themes with too few reviews* (1–4 supporting reviews) — the
+  engine skips them because the LLM Critic would reject any insight from them anyway
+  (evidence check needs ≥ 5 citations).
+- **{n_eligible}** are *leaf themes with ≥ 5 supporting reviews* — these are the ones
+  that qualified for insight generation. One insight per theme → **{len(insights)}
+  insights**.
+""")
+
         st.markdown(f"#### All {len(insights)} insights, ranked by confidence")
-        st.caption("#1 is the most confident. Every insight the engine produced is shown here — the drop-off to what actually reaches the Dashboard is in **Quality Validated**.")
+        st.caption("#1 is the most confident. Every insight the engine produced is shown here — the drop-off from *generated* to *usable on Dashboard* is in **Quality Validated**.")
         rank_map = {id(i): idx + 1 for idx, i in enumerate(insights)}
         for ins in insights:
             _render_card(ins, rank=rank_map.get(id(ins)))
