@@ -1,11 +1,13 @@
 # Minimal deps for the Streamlit Cloud demo dashboard.
-# Full pipeline deps are in ../requirements.txt.
+# Full pipeline deps are in ../requirements-pipeline.txt.
+# Loose version pins so pip can resolve against whatever Python
+# runtime Streamlit Cloud currently ships.
 
-streamlit==1.39.0
-pandas==2.2.3
-plotly==5.24.1
-pyarrow==17.0.0
-duckdb==1.5.4
-python-dotenv==1.0.1
-sqlalchemy==2.0.35
-pyyaml==6.0.2
+streamlit>=1.35
+pandas>=2.0
+plotly>=5.0
+pyarrow>=15
+duckdb>=1.0
+python-dotenv>=1.0
+sqlalchemy>=2.0
+pyyaml>=6.0

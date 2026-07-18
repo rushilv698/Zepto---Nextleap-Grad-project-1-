@@ -16,7 +16,7 @@ cd "Part 1"
 python3.12 -m venv .venv
 source .venv/bin/activate
 pip install -U pip
-pip install -r requirements.txt
+pip install -r requirements-pipeline.txt
 
 # 2. Start Postgres + Weaviate
 docker compose up -d
