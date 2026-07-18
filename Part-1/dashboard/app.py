@@ -19,7 +19,107 @@ import streamlit as st
 
 from dashboard.data import has_table, is_demo_mode, query
 
-st.set_page_config(page_title="Zepto Discovery Engine", layout="wide")
+st.set_page_config(
+    page_title="Zepto Discovery Engine",
+    page_icon="🟣",
+    layout="wide",
+    initial_sidebar_state="collapsed",
+)
+
+# ---- Zepto design language: brand palette + polish -------------------------
+ZEPTO_PURPLE = "#7C21DA"
+ZEPTO_PURPLE_DEEP = "#5C0DBA"
+ZEPTO_PURPLE_SOFT = "#F6F0FE"
+ZEPTO_PINK = "#EE1B7C"
+ZEPTO_GREEN = "#16A34A"
+
+st.markdown(
+    f"""
+    <style>
+      /* Typeface — match Zepto's clean sans stack */
+      html, body, [class*="css"]  {{
+        font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI",
+                     "Helvetica Neue", Arial, sans-serif;
+      }}
+      /* Headings a touch tighter and bolder — matches Zepto product headings */
+      h1, h2, h3, h4 {{ letter-spacing: -0.01em; }}
+      h1 {{ font-weight: 800 !important; }}
+
+      /* Purple wordmark banner */
+      .zepto-brandbar {{
+        display: flex; align-items: center; gap: 14px;
+        padding: 16px 20px; border-radius: 16px;
+        background: linear-gradient(135deg, {ZEPTO_PURPLE} 0%, {ZEPTO_PURPLE_DEEP} 100%);
+        color: white; margin-bottom: 12px;
+        box-shadow: 0 6px 24px rgba(124, 33, 218, 0.18);
+      }}
+      .zepto-brandbar .z-logo {{
+        background: white; padding: 6px 12px; border-radius: 10px;
+        line-height: 1;
+      }}
+      .zepto-brandbar .z-title {{
+        font-weight: 800; font-size: 20px; line-height: 1.2;
+      }}
+      .zepto-brandbar .z-sub {{
+        font-size: 13px; opacity: 0.9; margin-top: 2px;
+      }}
+
+      /* Streamlit tab styling — pill row, purple underline on active */
+      .stTabs [data-baseweb="tab-list"] {{ gap: 6px; }}
+      .stTabs [data-baseweb="tab"] {{
+        padding: 8px 14px; border-radius: 10px; font-weight: 600;
+      }}
+      .stTabs [aria-selected="true"] {{
+        color: {ZEPTO_PURPLE} !important;
+        background: {ZEPTO_PURPLE_SOFT} !important;
+      }}
+
+      /* Containers with borders — Zepto uses soft rounded product cards */
+      div[data-testid="stVerticalBlockBorderWrapper"] {{
+        border-radius: 14px !important;
+        border-color: #EDE7F6 !important;
+      }}
+
+      /* Metric labels a touch darker */
+      div[data-testid="stMetricLabel"] {{ color: {ZEPTO_PURPLE_DEEP}; font-weight: 600; }}
+
+      /* Info / success / warning banners with brand rounding */
+      div[data-testid="stAlert"] {{ border-radius: 12px; }}
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+
+def _zepto_logo_svg(height: int = 34) -> str:
+    """Inline SVG rendering of the 'zepto' wordmark in brand purple.
+
+    Rebuilt from the reference image — a rounded wordmark with a notch cut
+    into the 'e' and a subtle dot inside the 'o'. Fully self-contained,
+    scales with `height` px.
+    """
+    return f"""
+    <svg xmlns="http://www.w3.org/2000/svg" height="{height}" viewBox="0 0 180 46"
+         style="display:block">
+      <text x="0" y="35" fill="{ZEPTO_PURPLE}"
+            font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif"
+            font-weight="900" font-size="42" letter-spacing="-2">zepto</text>
+    </svg>
+    """
+
+
+st.markdown(
+    f"""
+    <div class="zepto-brandbar">
+      <div class="z-logo">{_zepto_logo_svg(28)}</div>
+      <div>
+        <div class="z-title">AI-Powered Discovery Engine</div>
+        <div class="z-sub">Zepto Growth · Category expansion research</div>
+      </div>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 
 
 # ==================================================================
@@ -284,7 +384,6 @@ def load_v3_cards() -> pd.DataFrame:
 # ==================================================================
 # Page header
 # ==================================================================
-st.title("Zepto AI-Powered Discovery Engine")
 st.markdown(f"**Strategic goal:** {GOAL}")
 st.caption(
     "This engine ingests public user feedback (Play Store reviews, Reddit, YouTube comments, news), "

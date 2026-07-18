@@ -4,8 +4,10 @@ headless = true
 [browser]
 gatherUsageStats = false
 
+# Zepto design language
 [theme]
-primaryColor = "#8B33F7"
+primaryColor = "#7C21DA"          # zepto purple
 backgroundColor = "#FFFFFF"
-secondaryBackgroundColor = "#F5F5F7"
-textColor = "#111111"
+secondaryBackgroundColor = "#F6F0FE"  # very light violet tint
+textColor = "#171717"
+font = "sans serif"
