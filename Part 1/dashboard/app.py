@@ -701,11 +701,40 @@ Of the {n_parents + n_leaves} themes shown in the Themes tab:
   insights**.
 """)
 
-        st.markdown(f"#### All {len(insights)} insights, ranked by confidence")
+        st.markdown(f"#### All {len(insights)} insights that were generated, ranked by confidence")
         st.caption("#1 is the most confident. Every insight the engine produced is shown here — the drop-off from *generated* to *usable on Dashboard* is in **Quality Validated**.")
         rank_map = {id(i): idx + 1 for idx, i in enumerate(insights)}
         for ins in insights:
             _render_card(ins, rank=rank_map.get(id(ins)))
+
+        # ---- Themes that were rejected BEFORE generation ---------------
+        try:
+            all_leaf = th[th["parent_id"].notna()] if not th.empty else pd.DataFrame()
+            rejected_themes = (
+                all_leaf[(all_leaf["members"] > 0) & (all_leaf["members"] < MIN_MEMBERS_FOR_INSIGHT)]
+                .sort_values("members", ascending=False)
+                if not all_leaf.empty else pd.DataFrame()
+            )
+        except Exception:
+            rejected_themes = pd.DataFrame()
+
+        if not rejected_themes.empty:
+            st.markdown(f"#### {len(rejected_themes)} themes rejected before generation")
+            st.caption(
+                "Leaf themes that had at least one supporting review but fewer than 5 — "
+                "the engine skipped insight generation for these because a hypothesis inferred "
+                "from 1–4 quotes would be speculation, not signal. Shown here for transparency."
+            )
+            for _, t in rejected_themes.iterrows():
+                with st.container(border=True):
+                    st.markdown(f"**{t['name']}**  ·  🔴 Rejected before generation")
+                    if t["definition"]:
+                        st.caption(t["definition"])
+                    st.markdown(
+                        f"**Reason:** only {t['members']} supporting review"
+                        f"{'s' if t['members'] != 1 else ''} — "
+                        f"minimum {MIN_MEMBERS_FOR_INSIGHT} required for insight generation."
+                    )
 
 
 # ==================================================================
