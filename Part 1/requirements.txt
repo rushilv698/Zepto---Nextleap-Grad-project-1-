@@ -13,6 +13,12 @@ apify-client>=3.0.0,<4.0.0
 google-play-scraper==1.2.7   # Play Store direct — Apify actor is unreliable
 youtube-comment-downloader==0.1.78   # free, no API key needed
 
+# --- Demo/deploy ---
+duckdb==1.5.4   # SQL over Parquet for Streamlit Cloud fallback
+beautifulsoup4==4.15.0
+lxml==6.1.1
+googlenewsdecoder==0.1.7
+
 # --- Data ---
 pandas==2.2.3
 pyarrow==17.0.0

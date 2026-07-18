@@ -11,9 +11,12 @@ from dotenv import load_dotenv
 ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(ROOT / ".env")
 
-OPENAI_API_KEY = os.environ["OPENAI_API_KEY"]
+# Empty defaults so the dashboard can import this module without .env
+# (Streamlit Cloud demo mode). The scraper/pipeline modules that need these
+# will fail at their own point of use with a clearer error.
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
-APIFY_TOKENS: list[str] = [t.strip() for t in os.environ["APIFY_TOKENS"].split(",") if t.strip()]
+APIFY_TOKENS: list[str] = [t.strip() for t in os.environ.get("APIFY_TOKENS", "").split(",") if t.strip()]
 
 APIFY_REDDIT_ACTOR = os.environ.get("APIFY_REDDIT_ACTOR", "oAuCIx3ItNrs2okjQ")
 APIFY_TWITTER_ACTOR = os.environ.get("APIFY_TWITTER_ACTOR", "61RPP7dywgiy0JPD0")

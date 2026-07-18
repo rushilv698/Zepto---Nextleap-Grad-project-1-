@@ -1,12 +1,16 @@
 """Streamlit dashboard — the workflow deliverable.
 
-Run locally:  streamlit run dashboard/app.py
-Deploy:       Streamlit Community Cloud → repo path dashboard/app.py
+Run locally (with Docker Postgres up):
+    streamlit run dashboard/app.py
+
+Deploy to Streamlit Community Cloud:
+    Point at repo path dashboard/app.py — it auto-detects that Postgres is
+    unreachable and falls back to DuckDB reading the Parquet snapshots in
+    Part 1/demo_data/.
 """
 from __future__ import annotations
 
 import json
-import os
 import sys
 from collections import Counter
 from pathlib import Path
@@ -17,59 +21,66 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import pandas as pd
 import plotly.express as px
 import streamlit as st
-from sqlalchemy import text
 
-from pipeline.storage import engine
+from dashboard.data import has_table, is_demo_mode, query
 
 st.set_page_config(page_title="Zepto Discovery Engine", layout="wide")
 
 
 @st.cache_data(ttl=300)
 def load_insight_cards() -> pd.DataFrame:
-    q = text(
+    return query(
         "SELECT id, title, one_line, detailed, persona_most_affected, primary_barrier, "
         "       suggested_experiment, confidence, confidence_breakdown, source_counts, "
         "       unique_authors, created_at "
         "FROM insight_cards ORDER BY confidence DESC"
     )
-    with engine().begin() as conn:
-        return pd.read_sql(q, conn)
 
 
 @st.cache_data(ttl=300)
 def load_extracted() -> pd.DataFrame:
-    q = text(
-        "SELECT e.id, e.intent, e.themes, e.user_persona, e.category_currently_buying, "
-        "       e.category_avoiding, e.barrier_summary, e.emotional_tone, e.actionable_quote, "
-        "       r.source, r.text, r.posted_at "
-        "FROM extracted_insights e JOIN raw_snippets r ON r.id = e.snippet_id "
-        "WHERE e.intent != 'Irrelevant' ORDER BY r.posted_at DESC NULLS LAST LIMIT 5000"
+    return query(
+        "SELECT id, intent, themes, user_persona, category_currently_buying, "
+        "       category_avoiding, barrier_summary, emotional_tone, actionable_quote, "
+        "       source, text, posted_at "
+        "FROM extracted_insights "
+        "WHERE intent != 'Irrelevant' "
+        "ORDER BY posted_at DESC NULLS LAST LIMIT 5000"
     )
-    with engine().begin() as conn:
-        return pd.read_sql(q, conn)
 
 
 @st.cache_data(ttl=300)
 def counts() -> dict:
-    with engine().begin() as conn:
-        return {
-            "raw":       conn.execute(text("SELECT COUNT(*) FROM raw_snippets")).scalar_one(),
-            "filtered":  conn.execute(text("SELECT COUNT(*) FROM filtered_snippets")).scalar_one() if _has_table("filtered_snippets") else 0,
-            "extracted": conn.execute(text("SELECT COUNT(*) FROM extracted_insights")).scalar_one(),
-            "cards":     conn.execute(text("SELECT COUNT(*) FROM insight_cards")).scalar_one(),
-        }
-
-
-def _has_table(name: str) -> bool:
-    with engine().begin() as conn:
-        return bool(conn.execute(
-            text("SELECT 1 FROM information_schema.tables WHERE table_name=:n"),
-            {"n": name},
-        ).first())
+    try:
+        r = query(
+            "SELECT COUNT(*) AS raw FROM raw_counts"
+        )
+        # In demo mode, raw_totals is a single-row precomputed table
+        if has_table("raw_totals"):
+            df = query("SELECT * FROM raw_totals LIMIT 1")
+            if not df.empty:
+                row = df.iloc[0]
+                return {
+                    "raw":       int(row.get("raw", 0)),
+                    "filtered":  int(row.get("filtered", 0)),
+                    "extracted": int(row.get("extracted", 0)),
+                    "cards":     int(row.get("cards", 0)),
+                }
+    except Exception:
+        pass
+    # Live mode fallback
+    return {
+        "raw":       int(query("SELECT COUNT(*) AS n FROM raw_snippets")["n"].iloc[0]) if has_table("raw_snippets") else 0,
+        "filtered":  int(query("SELECT COUNT(*) AS n FROM filtered_snippets")["n"].iloc[0]) if has_table("filtered_snippets") else 0,
+        "extracted": int(query("SELECT COUNT(*) AS n FROM extracted_insights")["n"].iloc[0]) if has_table("extracted_insights") else 0,
+        "cards":     int(query("SELECT COUNT(*) AS n FROM insight_cards")["n"].iloc[0]) if has_table("insight_cards") else 0,
+    }
 
 
 st.title("Zepto AI-Powered Discovery Engine")
 st.caption("Systematically surfacing *why* Zepto users stay in habit loops and rarely try new categories.")
+if is_demo_mode():
+    st.info("📦 **Demo mode** — reading pre-computed snapshots. See the [source repo](https://github.com/rushilv698/Zepto---Nextleap-Grad-project-1-) for the live pipeline.")
 
 with st.sidebar:
     st.header("Pipeline stats")
@@ -80,16 +91,13 @@ with st.sidebar:
         st.metric("Extracted insights", f"{c['extracted']:,}")
         st.metric("Insight cards",      f"{c['cards']:,}")
     except Exception as e:
-        st.error(f"DB unavailable: {e}")
+        st.error(f"Stats unavailable: {e}")
 
 tab_v2, tab0, tab1, tab2, tab_v3, tab3, tab4 = st.tabs(
     ["v2 Themes + Insights (validated)", "Corpus hypotheses (reasoning)",
      "Strategic Q&A", "Insight cards (v1)", "Insight cards (v3, adversarial)",
      "Trends", "Raw explorer"]
 )
-
-# Which taxonomy version to render in the v2 tab
-_V2_TAXONOMY_CHOICE = None  # set by radio inside tab_v2
 
 # ------------- v2 THEMES + VALIDATED INSIGHTS -----------------
 with tab_v2:
@@ -106,112 +114,112 @@ with tab_v2:
              "exploration / hesitation / decision-process — directly on the MAC-per-new-category goal.",
     )
     try:
-        with engine().begin() as conn:
-            has_v2 = bool(conn.execute(text(
-                "SELECT 1 FROM information_schema.tables WHERE table_name='insights_v2'"
-            )).first())
-            if not has_v2:
-                st.info("v2 pipeline not yet run. `python -m pipeline.themes_seed` etc.")
-            else:
-                # Corpus health
-                q = pd.read_sql(text("""
-                    SELECT COALESCE(is_spam::text,'null') AS is_spam,
-                           COALESCE(is_relevant::text,'null') AS is_relevant,
+        if not has_table("insights_v2"):
+            st.info("v2 pipeline not yet run.")
+        else:
+            # Corpus health
+            try:
+                q = query("""
+                    SELECT COALESCE(CAST(is_spam AS VARCHAR), 'null') AS is_spam,
+                           COALESCE(CAST(is_relevant AS VARCHAR), 'null') AS is_relevant,
                            CASE WHEN dup_of IS NOT NULL THEN 'dup' ELSE 'unique' END AS dedup,
                            COUNT(*) AS n
                     FROM snippet_quality GROUP BY 1,2,3 ORDER BY 4 DESC
-                """), conn)
+                """)
                 if not q.empty:
                     st.subheader("Filtration funnel")
                     st.dataframe(q, hide_index=True)
-                # Theme taxonomy summary — filtered by selected taxonomy version
-                th = pd.read_sql(text("""
-                    SELECT t.id, t.name, t.definition, t.status, t.parent_id,
-                           (SELECT name FROM themes p WHERE p.id = t.parent_id) AS parent_name,
-                           (SELECT COUNT(*) FROM review_themes rt WHERE rt.theme_id = t.id
-                              AND rt.taxonomy_version = :v) AS members
-                    FROM themes t
-                    WHERE t.merged_into IS NULL AND t.taxonomy_version = :v
-                    ORDER BY parent_id NULLS FIRST, members DESC
-                """), conn, params={"v": int(tax_v)})
-                if not th.empty:
-                    st.subheader(f"Taxonomy — {len(th)} themes (parents + leaves)")
-                    st.dataframe(th[["id","name","status","parent_name","members","definition"]],
-                                 hide_index=True, use_container_width=True)
-                else:
-                    st.info("No themes yet. `python -m pipeline.themes_seed`")
-                # Insights, ranked by confidence
-                ins = pd.read_sql(text("""
-                    SELECT i.id, i.theme_id, t.name AS theme,
-                           i.hypothesis, i.one_line, i.detailed,
-                           i.suggested_experiment, i.part_2_probe,
-                           i.confidence, i.validation_status, i.critic_verdict, i.critic_notes,
-                           i.confidence_breakdown
-                    FROM insights_v2 i
-                    LEFT JOIN themes t ON t.id = i.theme_id
-                    WHERE i.taxonomy_version = :v
-                    ORDER BY i.confidence DESC NULLS LAST
-                """), conn, params={"v": int(tax_v)})
-                if ins.empty:
-                    st.info("No insights yet. `python -m pipeline.insights_generate`")
-                else:
-                    st.subheader(f"Insights — {len(ins)} generated")
-                    statuses = ["(any)"] + sorted(ins["validation_status"].dropna().unique().tolist())
-                    verdicts = ["(any)"] + sorted(ins["critic_verdict"].dropna().unique().tolist())
-                    col1, col2, col3 = st.columns(3)
-                    with col1: st_pick = st.selectbox("Status", statuses, key="v2_status")
-                    with col2: v_pick = st.selectbox("Critic verdict", verdicts, key="v2_verdict")
-                    with col3: min_c = st.slider("Min confidence", 0, 100, 40, key="v2_conf")
-                    f = ins[ins["confidence"].fillna(0) >= min_c]
-                    if st_pick != "(any)": f = f[f["validation_status"] == st_pick]
-                    if v_pick != "(any)": f = f[f["critic_verdict"] == v_pick]
-                    for _, r in f.iterrows():
-                        badge = {"confirmed":"🟢 confirmed","exploratory":"🟡 exploratory","shelved":"🔴 shelved","revising":"🟠 revising"}.get(r["validation_status"], r["validation_status"])
-                        with st.container(border=True):
-                            st.subheader(f"{r['theme']}  ·  conf {r['confidence']:.0f}  ·  {badge}")
-                            st.markdown(f"**Hypothesis:** {r['hypothesis']}")
-                            if r["one_line"]:
-                                st.markdown(f"_{r['one_line']}_")
-                            st.write(r["detailed"])
-                            if r["suggested_experiment"]:
-                                st.markdown(f"**Experiment:** {r['suggested_experiment']}")
-                            if r["part_2_probe"]:
-                                st.markdown(f"**Interview probe:** {r['part_2_probe']}")
-                            if r["critic_notes"]:
-                                with st.expander(f"LLM critic verdict: {r['critic_verdict']}"):
-                                    st.write(r["critic_notes"])
-                            bd = r["confidence_breakdown"]
-                            if bd:
-                                try:
-                                    b = bd if isinstance(bd, dict) else json.loads(bd)
-                                    with st.expander("Validation breakdown"):
-                                        st.json(b)
-                                except Exception:
-                                    pass
+            except Exception:
+                pass
+
+            # Theme taxonomy summary
+            th = query("""
+                SELECT t.id, t.name, t.definition, t.status, t.parent_id,
+                       (SELECT name FROM themes p WHERE p.id = t.parent_id) AS parent_name,
+                       (SELECT COUNT(*) FROM review_themes rt WHERE rt.theme_id = t.id
+                          AND rt.taxonomy_version = :v) AS members
+                FROM themes t
+                WHERE t.merged_into IS NULL AND t.taxonomy_version = :v
+                ORDER BY parent_id NULLS FIRST, members DESC
+            """, params={"v": int(tax_v)})
+            if not th.empty:
+                st.subheader(f"Taxonomy v{tax_v} — {len(th)} themes")
+                st.dataframe(th[["id", "name", "status", "parent_name", "members", "definition"]],
+                             hide_index=True, use_container_width=True)
+            else:
+                st.info("No themes at this version yet.")
+
+            # Insights
+            ins = query("""
+                SELECT id, theme_id, theme, hypothesis, one_line, detailed,
+                       suggested_experiment, part_2_probe,
+                       confidence, validation_status, critic_verdict, critic_notes,
+                       confidence_breakdown
+                FROM insights_v2
+                WHERE taxonomy_version = :v
+                ORDER BY confidence DESC NULLS LAST
+            """, params={"v": int(tax_v)})
+            if ins.empty:
+                st.info("No insights at this version.")
+            else:
+                st.subheader(f"Insights — {len(ins)} generated")
+                statuses = ["(any)"] + sorted(ins["validation_status"].dropna().unique().tolist())
+                verdicts = ["(any)"] + sorted(ins["critic_verdict"].dropna().unique().tolist())
+                col1, col2, col3 = st.columns(3)
+                with col1: st_pick = st.selectbox("Status", statuses, key=f"v2_status_{tax_v}")
+                with col2: v_pick = st.selectbox("Critic verdict", verdicts, key=f"v2_verdict_{tax_v}")
+                with col3: min_c = st.slider("Min confidence", 0, 100, 30, key=f"v2_conf_{tax_v}")
+                f = ins[ins["confidence"].fillna(0) >= min_c]
+                if st_pick != "(any)": f = f[f["validation_status"] == st_pick]
+                if v_pick != "(any)": f = f[f["critic_verdict"] == v_pick]
+                for _, r in f.iterrows():
+                    badge = {"confirmed": "🟢 confirmed", "exploratory": "🟡 exploratory",
+                             "shelved": "🔴 shelved", "revising": "🟠 revising"}.get(r["validation_status"], r["validation_status"])
+                    with st.container(border=True):
+                        st.subheader(f"{r['theme']}  ·  conf {r['confidence']:.0f}  ·  {badge}")
+                        st.markdown(f"**Hypothesis:** {r['hypothesis']}")
+                        if r["one_line"]:
+                            st.markdown(f"_{r['one_line']}_")
+                        st.write(r["detailed"])
+                        if r["suggested_experiment"]:
+                            st.markdown(f"**Experiment:** {r['suggested_experiment']}")
+                        if r["part_2_probe"]:
+                            st.markdown(f"**Interview probe:** {r['part_2_probe']}")
+                        if r["critic_notes"]:
+                            with st.expander(f"LLM critic verdict: {r['critic_verdict']}"):
+                                st.write(r["critic_notes"])
+                        bd = r["confidence_breakdown"]
+                        if bd:
+                            try:
+                                b = bd if isinstance(bd, dict) else json.loads(bd)
+                                with st.expander("Validation breakdown"):
+                                    st.json(b)
+                            except Exception:
+                                pass
     except Exception as e:
         st.error(f"v2 tab failed: {e}")
+
 
 # ------------- Corpus hypotheses (reasoning layer) --------------
 with tab0:
     st.markdown("### Reasoning layer output — hypotheses inferred *across the whole corpus*")
     st.caption("Different in kind from insight cards: this asked GPT-4.1 to reason about the corpus as a whole, including inferring signal from what's ABSENT.")
     try:
-        with engine().begin() as conn:
-            top = conn.execute(text(
-                "SELECT DISTINCT top_line_read, what_this_corpus_cannot_answer, recommended_next_data_collection "
-                "FROM corpus_hypotheses ORDER BY 1 LIMIT 1"
-            )).first()
-            hyps = pd.read_sql(
-                text("SELECT rank, title, claim, reasoning, grounded_in, "
-                     "counter_evidence_that_would_disprove, confidence, novelty, "
-                     "implication_for_zepto, interview_probe "
-                     "FROM corpus_hypotheses ORDER BY rank"),
-                conn,
-            )
-        if top:
-            st.info(f"**Top-line read:** {top[0]}")
+        top_df = query(
+            "SELECT DISTINCT top_line_read, what_this_corpus_cannot_answer, recommended_next_data_collection "
+            "FROM corpus_hypotheses LIMIT 1"
+        )
+        top = None if top_df.empty else top_df.iloc[0]
+        hyps = query(
+            "SELECT rank, title, claim, reasoning, grounded_in, "
+            "counter_evidence_that_would_disprove, confidence, novelty, "
+            "implication_for_zepto, interview_probe "
+            "FROM corpus_hypotheses ORDER BY rank"
+        )
+        if top is not None:
+            st.info(f"**Top-line read:** {top['top_line_read']}")
         if hyps.empty:
-            st.warning("No corpus hypotheses yet. Run `python -m pipeline.reason`.")
+            st.warning("No corpus hypotheses yet.")
         else:
             for _, h in hyps.iterrows():
                 emoji = {"high": "🟢", "medium": "🟡", "low": "🔴"}.get(h["confidence"], "⚪")
@@ -230,12 +238,13 @@ with tab0:
                     st.markdown(f"**Counter-evidence that would disprove:** {h['counter_evidence_that_would_disprove']}")
                     st.markdown(f"**Implication for Zepto:** {h['implication_for_zepto']}")
                     st.markdown(f"**Interview probe:** _{h['interview_probe']}_")
-        if top:
+        if top is not None:
             with st.expander("Honest limits of this corpus"):
-                st.markdown(f"**Can't answer:** {top[1]}")
-                st.markdown(f"**Recommended next data:** {top[2]}")
+                st.markdown(f"**Can't answer:** {top['what_this_corpus_cannot_answer']}")
+                st.markdown(f"**Recommended next data:** {top['recommended_next_data_collection']}")
     except Exception as e:
         st.error(f"Failed to load hypotheses: {e}")
+
 
 # ------------- Strategic Q&A -----------------
 STRATEGIC_QS = [
@@ -244,9 +253,9 @@ STRATEGIC_QS = [
     ("What prevents users from exploring new categories?",
      lambda df: df[df["intent"] == "Exploration_Blocker"]),
     ("What role do habits play in shopping behavior?",
-     lambda df: df[df["themes"].apply(lambda t: "habit_loop" in (t or []))]),
+     lambda df: df[df["themes"].apply(lambda t: t is not None and "habit_loop" in (t if isinstance(t, list) else json.loads(t) if isinstance(t, str) and t.startswith('[') else []))]),
     ("What information do users need before trying a new category?",
-     lambda df: df[df["themes"].apply(lambda t: "information_gap" in (t or []))]),
+     lambda df: df[df["themes"].apply(lambda t: t is not None and "information_gap" in (t if isinstance(t, list) else json.loads(t) if isinstance(t, str) and t.startswith('[') else []))]),
     ("What frustrations emerge repeatedly?",
      lambda df: df[df["emotional_tone"].isin(["frustration", "anger"])]),
     ("Which user segments are more likely to experiment?",
@@ -254,32 +263,39 @@ STRATEGIC_QS = [
     ("What unmet needs emerge consistently across discussions?",
      lambda df: df[df["intent"] == "Unmet_Need"]),
     ("How do users discover products today?",
-     lambda df: df[df["themes"].apply(lambda t: "discovery_UI" in (t or []))]),
+     lambda df: df[df["themes"].apply(lambda t: t is not None and "discovery_UI" in (t if isinstance(t, list) else json.loads(t) if isinstance(t, str) and t.startswith('[') else []))]),
 ]
 
 with tab1:
     try:
         ex = load_extracted()
-        for q, filt in STRATEGIC_QS:
-            with st.expander(q, expanded=False):
+        for q_text, filt in STRATEGIC_QS:
+            with st.expander(q_text, expanded=False):
                 sub = filt(ex)
                 st.write(f"**{len(sub)} snippets matched**")
                 if len(sub) == 0:
-                    st.info("No data yet — run the pipeline first.")
+                    st.info("No data yet.")
                     continue
                 theme_counter = Counter()
                 for lst in sub["themes"].dropna():
-                    theme_counter.update(lst or [])
+                    if isinstance(lst, str):
+                        try:
+                            lst = json.loads(lst)
+                        except Exception:
+                            lst = []
+                    if isinstance(lst, list):
+                        theme_counter.update(lst)
                 if theme_counter:
                     tt = pd.DataFrame(theme_counter.most_common(8), columns=["theme", "count"])
                     st.plotly_chart(px.bar(tt, x="theme", y="count"), use_container_width=True)
                 st.markdown("**Sample quotes:**")
-                for _, row in sub[sub["actionable_quote"]].head(5).iterrows():
-                    st.markdown(f"> {row['text'][:400]} \n> — *{row['source']}*")
+                for _, row in sub[sub["actionable_quote"] == True].head(5).iterrows():
+                    st.markdown(f"> {row['text'][:400]}\n> — *{row['source']}*")
     except Exception as e:
         st.error(f"Failed to load: {e}")
 
-# ------------- Insight cards ------------------
+
+# ------------- Insight cards v1 ------------------
 with tab2:
     try:
         cards = load_insight_cards()
@@ -306,27 +322,29 @@ with tab2:
                     cols[1].markdown(f"**Barrier**: {r['primary_barrier']}")
                     cols[2].markdown(f"**Unique authors**: {r['unique_authors']}")
                     if r["source_counts"]:
-                        sc = r["source_counts"] if isinstance(r["source_counts"], dict) else json.loads(r["source_counts"])
-                        st.caption(" · ".join(f"{k}: {v}" for k, v in sc.items()))
+                        try:
+                            sc = r["source_counts"] if isinstance(r["source_counts"], dict) else json.loads(r["source_counts"])
+                            st.caption(" · ".join(f"{k}: {v}" for k, v in sc.items()))
+                        except Exception:
+                            pass
                     st.markdown(f"**Suggested experiment:** {r['suggested_experiment']}")
     except Exception as e:
         st.error(f"Failed to load: {e}")
+
 
 # ------------- Insight cards v3 (adversarial) --------------
 with tab_v3:
     st.caption("Same clustering + hypothesis + counter-evidence + Part-2 interview probes. Use these cards to write your Part 2 interview scripts.")
     try:
-        with engine().begin() as conn:
-            v3 = pd.read_sql(
-                text("SELECT id, title, hypothesis, detailed, persona_most_affected, primary_barrier, "
-                     "supporting_evidence, counter_evidence_check, confidence_in_hypothesis, "
-                     "suggested_experiment, part_2_interview_prompts, confidence, source_counts, "
-                     "brand_counts, discovery_breakdown, unique_authors "
-                     "FROM insight_cards_v3 ORDER BY confidence DESC"),
-                conn,
-            )
+        v3 = query(
+            "SELECT id, title, hypothesis, detailed, persona_most_affected, primary_barrier, "
+            "supporting_evidence, counter_evidence_check, confidence_in_hypothesis, "
+            "suggested_experiment, part_2_interview_prompts, confidence, source_counts, "
+            "brand_counts, discovery_breakdown, unique_authors "
+            "FROM insight_cards_v3 ORDER BY confidence DESC"
+        )
         if v3.empty:
-            st.warning("No v3 cards. Run `python -m pipeline.synthesize_v3`.")
+            st.warning("No v3 cards.")
         else:
             conf_h = ["(any)"] + sorted(v3["confidence_in_hypothesis"].dropna().unique().tolist())
             personas = ["(any)"] + sorted(v3["persona_most_affected"].dropna().unique().tolist())
@@ -352,8 +370,11 @@ with tab_v3:
                     cols[1].markdown(f"**Barrier**: {r['primary_barrier']}")
                     cols[2].markdown(f"**Unique authors**: {r['unique_authors']}")
                     if r["brand_counts"]:
-                        bc = r["brand_counts"] if isinstance(r["brand_counts"], dict) else json.loads(r["brand_counts"])
-                        st.caption("Brands: " + " · ".join(f"{k}: {v}" for k, v in bc.items()))
+                        try:
+                            bc = r["brand_counts"] if isinstance(r["brand_counts"], dict) else json.loads(r["brand_counts"])
+                            st.caption("Brands: " + " · ".join(f"{k}: {v}" for k, v in bc.items()))
+                        except Exception:
+                            pass
                     with st.expander("Supporting evidence"):
                         st.write(r["supporting_evidence"])
                     with st.expander("Counter-evidence check"):
@@ -371,6 +392,7 @@ with tab_v3:
     except Exception as e:
         st.error(f"Failed to load v3 cards: {e}")
 
+
 # ------------- Trends -------------------------
 with tab3:
     try:
@@ -385,18 +407,24 @@ with tab3:
                         title="Signal volume by intent, over time"),
                 use_container_width=True,
             )
-            # top barriers over time
-            explode = ex.explode("themes")
-            explode = explode[explode["themes"].notna()]
-            byday = explode.groupby(["day", "themes"]).size().reset_index(name="n")
-            top = explode["themes"].value_counts().head(5).index.tolist()
-            byday = byday[byday["themes"].isin(top)]
-            st.plotly_chart(
-                px.line(byday, x="day", y="n", color="themes", title="Top 5 barriers over time"),
-                use_container_width=True,
+            # Explode themes for time-series
+            ex_copy = ex.copy()
+            ex_copy["themes_list"] = ex_copy["themes"].apply(
+                lambda t: t if isinstance(t, list) else (json.loads(t) if isinstance(t, str) and t.startswith('[') else [])
             )
+            explode = ex_copy.explode("themes_list")
+            explode = explode[explode["themes_list"].notna()]
+            if not explode.empty:
+                byday = explode.groupby(["day", "themes_list"]).size().reset_index(name="n")
+                top = explode["themes_list"].value_counts().head(5).index.tolist()
+                byday = byday[byday["themes_list"].isin(top)]
+                st.plotly_chart(
+                    px.line(byday, x="day", y="n", color="themes_list", title="Top 5 barriers over time"),
+                    use_container_width=True,
+                )
     except Exception as e:
         st.error(f"Failed to load: {e}")
+
 
 # ------------- Raw explorer -------------------
 with tab4:
