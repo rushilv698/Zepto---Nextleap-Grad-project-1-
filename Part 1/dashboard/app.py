@@ -98,8 +98,9 @@ def _unified_insights() -> list[dict]:
     return out
 
 
-def _render_card(ins: dict) -> None:
-    header_bits = [ins["title"], RATING_LABEL.get(ins["rating"], "⚪")]
+def _render_card(ins: dict, rank: int | None = None) -> None:
+    rank_prefix = f"#{rank}  ·  " if rank is not None else ""
+    header_bits = [rank_prefix + ins["title"], RATING_LABEL.get(ins["rating"], "⚪")]
     if ins.get("status"):
         header_bits.append(STATUS_LABEL.get(ins["status"], ins["status"]))
     with st.container(border=True):
@@ -260,6 +261,22 @@ tab_dash, tab_raw, tab_filter, tab_themes, tab_insights, tab_quality, tab_method
 with tab_dash:
     st.markdown("### The story in one page")
 
+    with st.expander("How to read this dashboard", expanded=False):
+        st.markdown(f"""
+This page shows the **final usable output** of the pipeline — insights that either
+(a) come from whole-corpus reasoning, or (b) passed the 5-check validation gate + LLM Critic.
+
+- **Top-line reading** — a single sentence describing what the corpus tells us about the goal:
+  *"{GOAL}"*
+- **Ranking** — insights are listed by confidence (High → Medium → Low). #1 is the most confident.
+- **Source badge** on each card:
+  - *Corpus-level inference* — reasoned across the whole corpus, including from what users DON'T say.
+  - *Evidence-linked* — grounded in specific cited quotes from a theme cluster.
+- **Rating** = confidence in the hypothesis. **Status** (on evidence-linked cards only) = where the insight sits after the validation gate.
+
+Insights the critic rejected are **hidden here** but visible in the Insights Generated and Quality Validated tabs for transparency.
+""")
+
     hyps = load_corpus_hypotheses()
     if not hyps.empty:
         st.info(f"**Top-line reading of the corpus:**  {hyps['top_line_read'].iloc[0]}")
@@ -303,8 +320,8 @@ with tab_dash:
             "independent LLM Critic). Insights the critic rejected are hidden here and available "
             "in the Insights and Quality Validated tabs for transparency."
         )
-        for ins in usable:
-            _render_card(ins)
+        for rank, ins in enumerate(usable, start=1):
+            _render_card(ins, rank=rank)
 
 
 # ==================================================================
@@ -316,6 +333,28 @@ with tab_raw:
         f"**{TOTALS['raw']:,} snippets** collected from four public sources across four Indian "
         "quick-commerce brands."
     )
+
+    with st.expander("How this data was obtained", expanded=False):
+        st.markdown("""
+The engine gathers **public user feedback at scale** from four independent surface areas — each
+chosen because it captures a different slice of the customer voice:
+
+1. **App-store reviews** — direct product feedback, high volume, complaint-shaped.
+2. **Reddit posts and comments** — organic discussion, richer mental-model signals.
+3. **YouTube comments** — reactions to ads, hauls, comparison videos, founder interviews.
+4. **News/business media** — analyst framing that shapes consumer perception.
+
+**Multi-brand:** we scrape Zepto (the primary subject) plus three competitors as a control set
+so any pattern found can be tested against "does this show up on the other apps too?" (see the
+expander below for the full rationale).
+
+**Multi-language:** English, Hindi, and Hinglish are all captured. The pipeline does not
+translate — modern LLMs handle all three natively, and translating loses nuance.
+
+**Freshness:** all data is scraped in real time. Each source's specific method (subreddits,
+video IDs, news queries) is listed in the "How each source was collected" section below so
+anyone can reproduce it.
+""")
 
     raw = load_raw_counts()
     zepto_n = int(raw[raw["brand"] == "zepto"]["n"].sum()) if not raw.empty else 0
@@ -403,6 +442,28 @@ with tab_filter:
         "Every snippet passes through eight sequential filters before it can influence any "
         "downstream analysis. Each layer removes a specific kind of noise or down-weights low-value signal."
     )
+
+    with st.expander("How filtration is designed", expanded=False):
+        st.markdown("""
+Filtration is not about removing noise for its own sake — it's about ensuring **only information
+capable of producing meaningful product insights** enters the discovery pipeline. Every review passes
+through sequential filters, each with a specific job:
+
+- **Layers 1–3** (language, spam, relevance) *drop* obvious noise: junk characters, coupon spam,
+  operational-only complaints that don't discuss shopping behavior.
+- **Layer 4** (semantic deduplication) prevents one loud opinion from being counted many times —
+  even if it's worded slightly differently across reviews.
+- **Layers 5–6** (behaviour, specificity) *tag and rank* rather than drop — they identify
+  reviews that describe real behavioral signal (routines, hesitation, trust, decisions) and
+  down-weight generic praise like "good app".
+- **Layer 7** combines all the ratings into a single Information Value Score used downstream
+  for prioritization.
+- **Layer 8** applies recency and regional weighting at scoring time — recent reviews and
+  city-specific patterns weigh more.
+
+Every filtration decision is stored, so nothing is silently dropped. The "keeper" counts below
+reflect what actually makes it to theme discovery.
+""")
 
     sq = load_snippet_quality()
     if sq.empty:
@@ -566,6 +627,28 @@ organizing shelf, the leaf is where the story lives.
 # ==================================================================
 with tab_insights:
     st.markdown("### Insights generated")
+
+    with st.expander("How these insights were generated", expanded=False):
+        st.markdown("""
+Two independent generation processes run in parallel — each answers the goal from a different angle:
+
+**Corpus-level inference** *(GPT-4.1)*
+- Reads the *entire filtered corpus* + representative quotes at once.
+- Reasons across the whole dataset — including from **what users DON'T say**.
+- Produces broad causal hypotheses about mental models.
+- Not subject to the 5-check gate (there's no theme cluster to check against), so rated on
+  the model's own honest confidence in the pattern.
+
+**Evidence-linked** *(DeepSeek generation + GPT-4.1 critic)*
+- One insight generated per leaf theme with ≥ 5 supporting reviews.
+- Generator cites specific review IDs as supporting evidence.
+- Independent LLM Critic (a different model) reviews each insight against retrieved counter-evidence.
+- Every one carries a suggested 2-week experiment and an open-ended interview probe.
+
+Both kinds of insights are shown together, ranked by confidence. The filter below lets you
+narrow to just one type or just the ones the Dashboard shows.
+""")
+
     st.caption(
         "This tab shows **every insight the engine produced** — both usable and shelved — for "
         "full transparency. The Dashboard tab shows only the usable ones; the Quality Validated "
@@ -596,7 +679,8 @@ with tab_insights:
             help="Evidence-linked insights rejected by the LLM Critic. NOT shown on the Dashboard.",
         )
 
-        st.markdown("#### Every insight, ranked by confidence")
+        st.markdown(f"#### All {len(insights)} insights, ranked by confidence")
+        st.caption("#1 is the most confident. Use the filter to narrow the view.")
         # Optional filter
         filter_type = st.radio(
             "Show",
@@ -615,8 +699,11 @@ with tab_insights:
         else:
             shown = insights
 
+        # Ranks come from the FULL sorted list so viewers can see where each
+        # card sits in the overall ranking (e.g. shelved #8 stays #8 in "Only shelved" view).
+        rank_map = {id(i): idx + 1 for idx, i in enumerate(insights)}
         for ins in shown:
-            _render_card(ins)
+            _render_card(ins, rank=rank_map.get(id(ins)))
 
 
 # ==================================================================
@@ -624,6 +711,30 @@ with tab_insights:
 # ==================================================================
 with tab_quality:
     st.markdown("### Insight quality — multi-layer validation")
+
+    with st.expander("How validation works", expanded=False):
+        st.markdown("""
+The PDF methodology says: *"insights generated by AI should never be accepted without validation."*
+This tab implements that philosophy — every theme-level insight is subjected to **five automated
+checks + an independent LLM Critic Agent** before it's tagged usable.
+
+Two design choices worth calling out:
+
+1. **The Critic is a DIFFERENT model from the generator.** Insights are generated by DeepSeek;
+   the Critic is GPT-4.1. Same model marking its own homework is worthless — a fresh model gives
+   an independent read.
+
+2. **The Critic sees retrieved counter-evidence, not just supporting quotes.** For each insight,
+   the pipeline searches the corpus for snippets that could *contradict* the hypothesis and hands
+   them to the Critic. The Critic then decides pass / revise / reject.
+
+Two validation layers from the PDF are **honestly not evaluated** — Behavioural Validation
+(recommendation CTR, category visits, repeat purchases) and Business & Experiment Validation
+(A/B uplift) both require Zepto internal analytics we don't have. They're flagged
+`not_evaluated` and `deferred_to_part_4` in every insight's confidence breakdown — never
+silently skipped.
+""")
+
     st.caption(
         "Every theme-level insight was scored on 5 automated validation checks plus an independent "
         "LLM Critic Agent (a different model from the generator) that reviewed each insight against "
@@ -690,12 +801,14 @@ with tab_quality:
         )
         st.dataframe(checks, hide_index=True, use_container_width=True)
 
-        # Compute validation matrix
+        # Compute validation matrix — sorted by confidence DESC (highest first)
+        primary_sorted = primary.sort_values("confidence", ascending=False, na_position="last").reset_index(drop=True)
         rows = []
-        for _, r in primary.iterrows():
+        for idx, r in primary_sorted.iterrows():
             bd = _parse_json(r["confidence_breakdown"]) or {}
             rating = _rating_from_confidence(r["confidence"])
             rows.append({
+                "rank": f"#{idx + 1}",
                 "theme": r["theme"],
                 "rating": RATING_LABEL[rating],
                 "confidence_score": r["confidence"],
@@ -716,7 +829,7 @@ with tab_quality:
         n_exploratory = int((primary["validation_status"] == "exploratory").sum())
         n_shelved = int((primary["validation_status"] == "shelved").sum())
 
-        st.markdown("#### Per-insight validation matrix")
+        st.markdown(f"#### Per-insight validation matrix  ·  {len(primary)} evidence-linked insights, ranked by confidence")
         st.dataframe(vm, hide_index=True, use_container_width=True)
 
         st.markdown("#### Usability summary")
