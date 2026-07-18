@@ -219,13 +219,53 @@ with tab_raw:
         "quick-commerce brands. Data was captured over several weeks."
     )
 
+    raw = load_raw_counts()
+
+    # Compute Zepto vs competitor split
+    zepto_n = int(raw[raw["brand"] == "zepto"]["n"].sum()) if not raw.empty else 0
+    comp_n = int(raw[raw["brand"] != "zepto"]["n"].sum()) if not raw.empty else 0
+
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("Total snippets", f"{TOTALS['raw']:,}")
-    col2.metric("Sources", "4")
-    col3.metric("Brands", "4")
+    col2.metric("Zepto (primary)", f"{zepto_n:,}",
+                delta=f"{100*zepto_n/max(TOTALS['raw'],1):.0f}%" if TOTALS["raw"] else None)
+    col3.metric("Competitors (control)", f"{comp_n:,}",
+                delta=f"{100*comp_n/max(TOTALS['raw'],1):.0f}%" if TOTALS["raw"] else None)
     col4.metric("Languages", "en / hi / hinglish")
 
-    raw = load_raw_counts()
+    # --- Why competitor data? ---
+    with st.expander(
+        "❓ Why did we collect competitor data if the project is about Zepto?",
+        expanded=True,
+    ):
+        st.markdown(f"""
+The project is about Zepto — **{zepto_n:,} of {TOTALS['raw']:,} snippets ({100*zepto_n/max(TOTALS['raw'],1):.0f}%) are Zepto**.
+The other **{comp_n:,} snippets ({100*comp_n/max(TOTALS['raw'],1):.0f}%) are from three competitors** (Blinkit, BigBasket, Swiggy Instamart)
+and serve a **specific analytical purpose**, not sample-padding:
+
+1. **Cross-source validation (a hard quality check).** For an insight to be tagged
+   `confirmed` in the "Quality validated" tab, its supporting evidence must span
+   at least **2 sources AND 2 brands**. Without competitor data, this check is
+   meaningless and every Zepto-only insight would degrade to `exploratory`.
+
+2. **Zepto-specific vs industry-wide separation.** If users complain about the
+   same thing on all four apps, it's an industry-level friction — not a Zepto
+   opportunity. Competitor data lets us tell those apart.
+
+3. **Real user comparison behavior — key for the exploration goal.** Users
+   *naturally* express category-exploration mental models while comparing brands:
+   "I use Zepto for groceries but Blinkit for produce" — this comparison IS the
+   mental model we're trying to surface. It only appears when both brands are named.
+
+**What competitor data materially contributed:**
+- v2.1 #1 (Repeat-Order Habit Loops) — built on cross-brand price-comparison quotes.
+- v2.1 #3 (Zepto Cafe vs Blinkit Bistro) — Zepto's real-world category-expansion
+  attempt, only visible with competitor context.
+- Reasoning-layer #3 (Trust is category-specific) — validated across all four brands.
+
+Competitor data is a **control group**, deliberately smaller than the Zepto
+primary set. It is *not* used to make claims about the competitors themselves.
+""")
 
     if not raw.empty:
         # Source × Brand matrix
@@ -235,8 +275,8 @@ with tab_raw:
         pivot.loc["TOTAL"] = pivot.sum(axis=0)
         st.dataframe(pivot, use_container_width=True)
 
-        # Two charts side-by-side
-        c1, c2 = st.columns(2)
+        # Three charts: source, brand pie, primary-vs-control split
+        c1, c2, c3 = st.columns(3)
         with c1:
             by_source = raw.groupby("source", as_index=False)["n"].sum().sort_values("n", ascending=False)
             st.plotly_chart(
@@ -249,6 +289,18 @@ with tab_raw:
             st.plotly_chart(
                 px.pie(by_brand, values="n", names="brand", title="By brand",
                        hole=0.4),
+                use_container_width=True,
+            )
+        with c3:
+            role = pd.DataFrame([
+                {"role": "Zepto (primary)", "n": zepto_n},
+                {"role": "Competitors (control)", "n": comp_n},
+            ])
+            st.plotly_chart(
+                px.pie(role, values="n", names="role", title="Primary vs control",
+                       hole=0.4,
+                       color_discrete_map={"Zepto (primary)": "#8B33F7",
+                                           "Competitors (control)": "#B4B4C1"}),
                 use_container_width=True,
             )
 
