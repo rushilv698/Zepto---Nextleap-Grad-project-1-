@@ -759,6 +759,49 @@ Of the {n_parents + n_leaves} themes shown in the Themes tab:
 - **{n_eligible}** are *leaf themes with ≥ 5 supporting reviews* — these are the ones
   that qualified for insight generation. One insight per theme → **{len(insights)}
   insights**.
+
+---
+
+**Why 5 and not some other number?**  Three overlapping reasons:
+
+1. **The downstream Evidence check needs ≥ 5 citations.** The 5-check validation gate
+   (see the Quality Validated tab) has an Evidence rule: *"≥ 5 supporting review IDs must
+   be cited by the generator."* A theme with only 4 supporting reviews can only cite 4 quotes
+   — the Evidence check would fail automatically, and the insight would be shelved regardless.
+   Generating below 5 wastes compute on hypotheses that can't pass validation.
+
+2. **PDF methodology guidance.** The methodology doc suggests ≥ 8 members for theme
+   promotion. **5 is the softened compromise** so v2.1 (only 546 expansion-relevant
+   snippets) produces any insights at all. Sticking to 8 would give us just one theme
+   (Repeat-Order Habit Loops, 17 members) with an insight.
+
+3. **LLM hallucination risk.** Below ~5 quotes the generator starts extrapolating —
+   *"these 3 users said X, therefore users in general believe Y"* — producing
+   confident-sounding but fabricated claims. The 5-quote floor is the point where the
+   pattern is more likely to be real than assumed.
+
+---
+
+**What would happen if we lowered the threshold to ≥ 3?**  Five themes would newly qualify:
+
+- **Category Exploration and Expansion** (3 members) — *the single most on-goal theme*
+- **Discovery Patterns and App Experience** (3)
+- **Payment Methods and Checkout Flexibility** (3)
+- **Trust and Transparency in Platform Practices** (4)
+- **Promotions, Offers, and Loyalty Perception** (4)
+
+Total insights generated would jump from **3 → 8**. But the validation gate would almost
+certainly shelve all five new ones:
+
+- **Evidence check:** 3–4 cited quotes < 5 required → fail.
+- **Statistical check:** 3–4 unique authors << 20 required → fail.
+- **Cross-source:** 3–4 quotes rarely span ≥ 2 sources AND ≥ 2 brands → likely fail.
+
+So the Dashboard usable count would probably stay at 2. The gain would be visible
+hypothesis text for *Category Exploration and Expansion* — the on-goal theme that
+currently produces no output at all. Useful for framing Part 2 interviews even at low
+confidence, but noisy for the Dashboard. **Documented here as a considered tradeoff,
+not run.**
 """)
 
         st.markdown(f"#### All {len(insights)} insights that were generated, ranked by confidence")
