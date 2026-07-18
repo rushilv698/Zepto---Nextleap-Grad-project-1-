@@ -10,7 +10,7 @@
 ## First-time setup (10 minutes)
 
 ```bash
-cd "Part 1"
+cd Part-1
 
 # 1. Python virtual env
 python3.12 -m venv .venv
