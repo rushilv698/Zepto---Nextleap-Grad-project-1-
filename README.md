@@ -206,4 +206,3 @@ Part 1/
 
 - `../Docs/NEXTLEAP GRADPROJECT 1 Mission Statement.docx` — official brief
 - `../Docs/NEXT LEAP GRAD PROJECT 1 Execution plan.docx` — strategic write-up
-
