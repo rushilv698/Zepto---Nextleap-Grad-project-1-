@@ -285,50 +285,54 @@ Insights the critic rejected are **hidden here** but visible in the Insights Gen
     if not insights:
         st.warning("No insights yet.")
     else:
-        # Split by pipeline — they are genuinely different in kind, so present them separately.
         hypotheses = [i for i in insights if i["source_type"] == "Working hypothesis"]
         evidence_all = [i for i in insights if i["source_type"] == "Evidence-linked"]
         evidence_usable = [i for i in evidence_all if i["passes_gate"]]
 
         st.markdown("---")
 
-        # -----------------------------------
-        # Section A — Working hypotheses (WHY)
-        # -----------------------------------
-        st.markdown(f"## A · Working hypotheses  ·  {len(hypotheses)} generated  ·  answer the *why*")
-        st.caption(
-            "GPT-4.1 was given the entire filtered corpus + representative quotes and asked to "
-            "reason about patterns, including from what users DON'T say. These are high-level "
-            "mental-model claims — they answer *why users don't explore new categories* at the "
-            "strategy level. They are inferences, not tied to specific cited quotes, and are "
-            "rated by the model's own honest confidence in each pattern."
-        )
-        for rank, ins in enumerate(hypotheses, start=1):
-            _render_card(ins, rank=rank)
-
-        st.markdown("---")
+        sub_cards, sub_hyps = st.tabs([
+            f"B · Evidence-linked insight cards ({len(evidence_usable)})",
+            f"A · Working hypotheses ({len(hypotheses)})",
+        ])
 
         # -----------------------------------
-        # Section B — Evidence-linked insights (WHAT)
+        # B — Evidence-linked insights (WHAT)
         # -----------------------------------
-        rejected = len(evidence_all) - len(evidence_usable)
-        st.markdown(
-            f"## B · Evidence-linked insights  ·  "
-            f"{len(evidence_all)} generated → {len(evidence_usable)} passed the quality gate  ·  "
-            "answer the *what*"
-        )
-        st.caption(
-            "One insight per theme cluster with 5+ supporting reviews. The generator cited specific "
-            "review IDs; an independent LLM Critic (GPT-4.1, a different model from the generator) "
-            "then reviewed each insight against retrieved counter-evidence. These are specific, "
-            "testable claims backed by traceable quotes — they answer *what specifically holds the "
-            f"behaviour in place*. {rejected} insight{'s were' if rejected != 1 else ' was'} rejected "
-            "by the Critic and hidden here (visible in Insights Generated and Quality Validated tabs)."
-        )
-        if not evidence_usable:
-            st.info("No evidence-linked insights survived the quality gate.")
-        for rank, ins in enumerate(evidence_usable, start=1):
-            _render_card(ins, rank=rank)
+        with sub_cards:
+            rejected = len(evidence_all) - len(evidence_usable)
+            st.markdown(
+                f"### Evidence-linked insight cards  ·  "
+                f"{len(evidence_all)} generated → {len(evidence_usable)} passed the quality gate  ·  "
+                "answer the *what*"
+            )
+            st.caption(
+                "One insight per theme cluster with 5+ supporting reviews. The generator cited specific "
+                "review IDs; an independent LLM Critic (GPT-4.1, a different model from the generator) "
+                "then reviewed each insight against retrieved counter-evidence. These are specific, "
+                "testable claims backed by traceable quotes — they answer *what specifically holds the "
+                f"behaviour in place*. {rejected} insight{'s were' if rejected != 1 else ' was'} rejected "
+                "by the Critic and hidden here (visible in Insights Generated and Quality Validated tabs)."
+            )
+            if not evidence_usable:
+                st.info("No evidence-linked insights survived the quality gate.")
+            for rank, ins in enumerate(evidence_usable, start=1):
+                _render_card(ins, rank=rank)
+
+        # -----------------------------------
+        # A — Working hypotheses (WHY)
+        # -----------------------------------
+        with sub_hyps:
+            st.markdown(f"### Working hypotheses  ·  {len(hypotheses)} generated  ·  answer the *why*")
+            st.caption(
+                "GPT-4.1 was given the entire filtered corpus + representative quotes and asked to "
+                "reason about patterns, including from what users DON'T say. These are high-level "
+                "mental-model claims — they answer *why users don't explore new categories* at the "
+                "strategy level. They are inferences, not tied to specific cited quotes, and are "
+                "rated by the model's own honest confidence in each pattern."
+            )
+            for rank, ins in enumerate(hypotheses, start=1):
+                _render_card(ins, rank=rank)
 
 
 # ==================================================================
@@ -637,80 +641,58 @@ with tab_insights:
 
     with st.expander("How these insights were generated", expanded=False):
         st.markdown("""
-Two independent generation processes run in parallel — each answers the goal from a different angle:
+Each insight is one hypothesis per leaf theme with 5+ supporting reviews.
 
-**Corpus-level inference** *(GPT-4.1)*
-- Reads the *entire filtered corpus* + representative quotes at once.
-- Reasons across the whole dataset — including from **what users DON'T say**.
-- Produces broad causal hypotheses about mental models.
-- Not subject to the 5-check gate (there's no theme cluster to check against), so rated on
-  the model's own honest confidence in the pattern.
+- **Generation** — DeepSeek reads a sample of the theme's reviews and produces a
+  causal claim, cites specific review IDs as supporting evidence, and drafts a
+  suggested 2-week experiment plus an open-ended interview probe.
+- **Independent critic** — a different model (GPT-4.1) then reviews each insight
+  against retrieved counter-evidence and returns a verdict of pass / revise / reject.
+- **Validation gate** — the 5-check matrix (evidence, cross-source, statistical,
+  cluster quality, critic) decides whether each insight ends up in the Dashboard.
 
-**Evidence-linked** *(DeepSeek generation + GPT-4.1 critic)*
-- One insight generated per leaf theme with ≥ 5 supporting reviews.
-- Generator cites specific review IDs as supporting evidence.
-- Independent LLM Critic (a different model) reviews each insight against retrieved counter-evidence.
-- Every one carries a suggested 2-week experiment and an open-ended interview probe.
-
-Both kinds of insights are shown together, ranked by confidence. The filter below lets you
-narrow to just one type or just the ones the Dashboard shows.
+This tab shows every insight the engine produced — both usable and shelved —
+for transparency. The Dashboard shows only the ones that passed.
 """)
 
     st.caption(
-        "This tab shows **every insight the engine produced** — both usable and shelved — for "
-        "full transparency. The Dashboard tab shows only the usable ones; the Quality Validated "
-        "tab shows the validation matrix that decides which ones pass."
+        "This tab shows **every evidence-linked insight the engine produced** — both usable "
+        "and shelved — for full transparency. The Dashboard shows only the ones that passed. "
+        "The Quality Validated tab shows the validation matrix that decides which ones pass."
     )
 
-    insights = _unified_insights()
+    insights = [i for i in _unified_insights() if i["source_type"] == "Evidence-linked"]
     if not insights:
-        st.warning("No insights yet.")
+        st.warning("No evidence-linked insights yet.")
     else:
         usable = [i for i in insights if i["passes_gate"]]
         shelved = [i for i in insights if not i["passes_gate"]]
-        n_corpus = sum(1 for i in insights if i["source_type"] == "Working hypothesis")
-        n_evidence = sum(1 for i in insights if i["source_type"] == "Evidence-linked")
 
-        # Two pipelines, side-by-side. They are different in kind, so don't force them into one funnel.
-        st.markdown("#### Two pipelines running in parallel")
-        col_a, col_b = st.columns(2)
-        with col_a:
-            st.markdown("**Working hypotheses**")
-            st.caption("Reasoned across the whole corpus. No validation gate — model's own honest confidence.")
-            st.metric("Generated", n_corpus)
-            st.metric("Usable on Dashboard", n_corpus, delta="100%", delta_color="off")
-        with col_b:
-            st.markdown("**Evidence-linked insights**")
-            st.caption("One per theme cluster, cited quotes, LLM Critic reviews each against retrieved counter-evidence.")
-            st.metric("Generated", n_evidence)
-            st.metric(
-                "Usable on Dashboard", n_evidence - len(shelved),
-                delta=f"−{len(shelved)} rejected by critic",
-                delta_color="inverse",
-            )
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Total generated", len(insights))
+        c2.metric("Usable on Dashboard", len(usable),
+                  delta=f"{100*len(usable)//max(len(insights),1)}% pass rate")
+        c3.metric(
+            "Shelved by critic", len(shelved),
+            delta=f"−{len(shelved)}",
+            delta_color="inverse",
+            help="Rejected by the LLM Critic. NOT shown on the Dashboard.",
+        )
 
         st.markdown(f"#### All {len(insights)} insights, ranked by confidence")
         st.caption("#1 is the most confident. Use the filter to narrow the view.")
-        # Optional filter
         filter_type = st.radio(
             "Show",
-            options=["All (usable + shelved)", "Only usable (Dashboard view)",
-                     "Only shelved", "Corpus-level only", "Evidence-linked only"],
+            options=["All (usable + shelved)", "Only usable", "Only shelved"],
             horizontal=True,
         )
-        if filter_type == "Only usable (Dashboard view)":
+        if filter_type == "Only usable":
             shown = usable
         elif filter_type == "Only shelved":
             shown = shelved
-        elif filter_type == "Corpus-level only":
-            shown = [i for i in insights if i["source_type"] == "Working hypothesis"]
-        elif filter_type == "Evidence-linked only":
-            shown = [i for i in insights if i["source_type"] == "Evidence-linked"]
         else:
             shown = insights
 
-        # Ranks come from the FULL sorted list so viewers can see where each
-        # card sits in the overall ranking (e.g. shelved #8 stays #8 in "Only shelved" view).
         rank_map = {id(i): idx + 1 for idx, i in enumerate(insights)}
         for ins in shown:
             _render_card(ins, rank=rank_map.get(id(ins)))
@@ -753,60 +735,37 @@ silently skipped.
 
     v2 = load_v2_insights()
     primary = v2[v2["taxonomy_version"] == PRIMARY_TAX_V] if not v2.empty else pd.DataFrame()
-    all_insights = _unified_insights()
     if primary.empty:
         st.warning("No insights yet.")
     else:
-        # Funnel visualization — evidence-linked pipeline only.
-        # (Working hypotheses have no validation gate, so a funnel for them would be a flat bar.)
         n_evidence = len(primary)
         n_critic_pass = int((primary["critic_verdict"] == "pass").sum())
         n_critic_revise = int((primary["critic_verdict"] == "revise").sum())
         n_critic_reject = int((primary["critic_verdict"] == "reject").sum())
-        n_hypotheses = sum(1 for i in all_insights if i["source_type"] == "Working hypothesis")
-        n_usable_evidence = n_critic_pass + n_critic_revise
-        n_usable_total = n_hypotheses + n_usable_evidence
+        n_usable = n_critic_pass + n_critic_revise
 
-        st.markdown("#### The validation funnel — evidence-linked insights only")
-        st.caption(
-            "This funnel tracks *only* the evidence-linked pipeline — the one that actually goes "
-            "through the 5-check gate + LLM Critic. Working hypotheses (from the corpus-level "
-            "pipeline) do not have a validation gate to funnel through, so they are shown as a "
-            "separate count on the right, not inside the funnel."
-        )
-
-        col_fun, col_side = st.columns([3, 1])
-        with col_fun:
-            funnel_fig = go.Figure(go.Funnel(
-                y=[
-                    "Evidence-linked insights generated",
-                    "Passed LLM Critic (pass / revise)",
-                    "Usable on Dashboard",
-                ],
-                x=[
-                    n_evidence,
-                    n_critic_pass + n_critic_revise,
-                    n_usable_evidence,
-                ],
-                textinfo="value+percent initial",
-                marker={"color": ["#C5A0FF", "#8B33F7", "#4CAF50"]},
-            ))
-            funnel_fig.update_layout(margin=dict(l=0, r=0, t=0, b=0), height=260)
-            st.plotly_chart(funnel_fig, use_container_width=True)
-        with col_side:
-            st.metric(
-                "Working hypotheses",
-                n_hypotheses,
-                help="From the separate corpus-level reasoning pipeline. Not gated — inferred across the whole corpus. Rated by model's own honest confidence.",
-            )
-            st.markdown(f"**Total usable on Dashboard:** **{n_usable_total}**  \n"
-                        f"({n_hypotheses} hypotheses + {n_usable_evidence} validated insights)")
+        st.markdown("#### The validation funnel")
+        funnel_fig = go.Figure(go.Funnel(
+            y=[
+                "Insights generated",
+                "Passed LLM Critic (pass / revise)",
+                "Usable on Dashboard",
+            ],
+            x=[
+                n_evidence,
+                n_critic_pass + n_critic_revise,
+                n_usable,
+            ],
+            textinfo="value+percent initial",
+            marker={"color": ["#C5A0FF", "#8B33F7", "#4CAF50"]},
+        ))
+        funnel_fig.update_layout(margin=dict(l=0, r=0, t=0, b=0), height=260)
+        st.plotly_chart(funnel_fig, use_container_width=True)
 
         st.markdown(
-            f"**Reading:** {n_evidence} evidence-linked insights were generated. The LLM Critic "
-            f"passed or revised {n_critic_pass + n_critic_revise} of them and rejected "
-            f"{n_critic_reject}. Combined with the {n_hypotheses} working hypotheses from the "
-            f"separate corpus-level pipeline, the Dashboard shows **{n_usable_total}** items in total."
+            f"**Reading:** {n_evidence} insights were generated. The LLM Critic passed or revised "
+            f"{n_critic_pass + n_critic_revise} of them and rejected {n_critic_reject}. "
+            f"The **{n_usable} usable** insights are what the Dashboard shows."
         )
 
         st.markdown("#### The five automated checks")
