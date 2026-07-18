@@ -643,58 +643,29 @@ with tab_insights:
         st.markdown("""
 Each insight is one hypothesis per leaf theme with 5+ supporting reviews.
 
-- **Generation** — DeepSeek reads a sample of the theme's reviews and produces a
-  causal claim, cites specific review IDs as supporting evidence, and drafts a
-  suggested 2-week experiment plus an open-ended interview probe.
-- **Independent critic** — a different model (GPT-4.1) then reviews each insight
-  against retrieved counter-evidence and returns a verdict of pass / revise / reject.
-- **Validation gate** — the 5-check matrix (evidence, cross-source, statistical,
-  cluster quality, critic) decides whether each insight ends up in the Dashboard.
+- **Sampling** — up to 15 highest-quality supporting reviews per theme.
+- **Generation** — DeepSeek reads that sample and produces a causal claim,
+  cites specific review IDs as supporting evidence, and drafts a suggested
+  2-week experiment plus an open-ended interview probe.
+- **Output per theme** — one insight card containing:
+  hypothesis · one-line · detailed reasoning · suggested experiment ·
+  interview probe.
 
-This tab shows every insight the engine produced — both usable and shelved —
-for transparency. The Dashboard shows only the ones that passed.
+This tab shows **every insight the engine generated — before any validation
+was applied**. The Quality Validated tab then puts each of them through the
+5-check matrix + independent LLM Critic to decide which ones survive to
+the Dashboard.
 """)
-
-    st.caption(
-        "This tab shows **every evidence-linked insight the engine produced** — both usable "
-        "and shelved — for full transparency. The Dashboard shows only the ones that passed. "
-        "The Quality Validated tab shows the validation matrix that decides which ones pass."
-    )
 
     insights = [i for i in _unified_insights() if i["source_type"] == "Evidence-linked"]
     if not insights:
         st.warning("No evidence-linked insights yet.")
     else:
-        usable = [i for i in insights if i["passes_gate"]]
-        shelved = [i for i in insights if not i["passes_gate"]]
-
-        c1, c2, c3 = st.columns(3)
-        c1.metric("Total generated", len(insights))
-        c2.metric("Usable on Dashboard", len(usable),
-                  delta=f"{100*len(usable)//max(len(insights),1)}% pass rate")
-        c3.metric(
-            "Shelved by critic", len(shelved),
-            delta=f"−{len(shelved)}",
-            delta_color="inverse",
-            help="Rejected by the LLM Critic. NOT shown on the Dashboard.",
-        )
-
+        st.metric("Total generated", len(insights))
         st.markdown(f"#### All {len(insights)} insights, ranked by confidence")
-        st.caption("#1 is the most confident. Use the filter to narrow the view.")
-        filter_type = st.radio(
-            "Show",
-            options=["All (usable + shelved)", "Only usable", "Only shelved"],
-            horizontal=True,
-        )
-        if filter_type == "Only usable":
-            shown = usable
-        elif filter_type == "Only shelved":
-            shown = shelved
-        else:
-            shown = insights
-
+        st.caption("#1 is the most confident. Every insight the engine produced is shown here — the drop-off to what actually reaches the Dashboard is in **Quality Validated**.")
         rank_map = {id(i): idx + 1 for idx, i in enumerate(insights)}
-        for ins in shown:
+        for ins in insights:
             _render_card(ins, rank=rank_map.get(id(ins)))
 
 
