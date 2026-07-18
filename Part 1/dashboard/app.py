@@ -1,12 +1,10 @@
-"""Streamlit dashboard — the workflow deliverable.
+"""Zepto Discovery Engine — Streamlit dashboard.
 
 Run locally (with Docker Postgres up):
     streamlit run dashboard/app.py
 
-Deploy to Streamlit Community Cloud:
-    Point at repo path dashboard/app.py — it auto-detects that Postgres is
-    unreachable and falls back to DuckDB reading the Parquet snapshots in
-    Part 1/demo_data/.
+Deployed on Streamlit Community Cloud — automatically falls back to reading
+Parquet snapshots in Part 1/demo_data/ when Postgres is unreachable.
 """
 from __future__ import annotations
 
@@ -15,11 +13,11 @@ import sys
 from collections import Counter
 from pathlib import Path
 
-# Allow `streamlit run dashboard/app.py` from the project root
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 import streamlit as st
 
 from dashboard.data import has_table, is_demo_mode, query
@@ -27,420 +25,608 @@ from dashboard.data import has_table, is_demo_mode, query
 st.set_page_config(page_title="Zepto Discovery Engine", layout="wide")
 
 
+# ==================================================================
+# Helpers
+# ==================================================================
+def _parse_json(v):
+    if isinstance(v, (dict, list)):
+        return v
+    if isinstance(v, str) and v.strip().startswith(("{", "[")):
+        try:
+            return json.loads(v)
+        except Exception:
+            return None
+    return None
+
+
 @st.cache_data(ttl=300)
-def load_insight_cards() -> pd.DataFrame:
+def load_raw_counts() -> pd.DataFrame:
+    return query("SELECT source, brand, n FROM raw_counts ORDER BY n DESC")
+
+
+@st.cache_data(ttl=300)
+def load_totals() -> dict:
+    if has_table("raw_totals"):
+        df = query("SELECT * FROM raw_totals LIMIT 1")
+        if not df.empty:
+            r = df.iloc[0]
+            return {"raw": int(r.get("raw", 0)), "filtered": int(r.get("filtered", 0)),
+                    "extracted": int(r.get("extracted", 0)), "cards": int(r.get("cards", 0))}
+    return {"raw": 0, "filtered": 0, "extracted": 0, "cards": 0}
+
+
+@st.cache_data(ttl=300)
+def load_snippet_quality() -> pd.DataFrame:
+    if not has_table("snippet_quality"):
+        return pd.DataFrame()
     return query(
-        "SELECT id, title, one_line, detailed, persona_most_affected, primary_barrier, "
-        "       suggested_experiment, confidence, confidence_breakdown, source_counts, "
-        "       unique_authors, created_at "
-        "FROM insight_cards ORDER BY confidence DESC"
+        "SELECT snippet_id, lang, is_spam, is_relevant, dup_of, "
+        "info_value_score, is_expansion_relevant FROM snippet_quality"
     )
 
 
 @st.cache_data(ttl=300)
-def load_extracted() -> pd.DataFrame:
-    return query(
-        "SELECT id, intent, themes, user_persona, category_currently_buying, "
-        "       category_avoiding, barrier_summary, emotional_tone, actionable_quote, "
-        "       source, text, posted_at "
-        "FROM extracted_insights "
-        "WHERE intent != 'Irrelevant' "
-        "ORDER BY posted_at DESC NULLS LAST LIMIT 5000"
-    )
+def load_themes_and_members(taxonomy_version: int) -> pd.DataFrame:
+    return query("""
+        SELECT t.id, t.name, t.definition, t.status, t.parent_id,
+               (SELECT name FROM themes p WHERE p.id = t.parent_id) AS parent_name,
+               (SELECT COUNT(*) FROM review_themes rt WHERE rt.theme_id = t.id
+                  AND rt.taxonomy_version = :v) AS members
+        FROM themes t
+        WHERE t.merged_into IS NULL AND t.taxonomy_version = :v
+        ORDER BY parent_id NULLS FIRST, members DESC
+    """, params={"v": int(taxonomy_version)})
 
 
 @st.cache_data(ttl=300)
-def counts() -> dict:
-    try:
-        r = query(
-            "SELECT COUNT(*) AS raw FROM raw_counts"
-        )
-        # In demo mode, raw_totals is a single-row precomputed table
-        if has_table("raw_totals"):
-            df = query("SELECT * FROM raw_totals LIMIT 1")
-            if not df.empty:
-                row = df.iloc[0]
-                return {
-                    "raw":       int(row.get("raw", 0)),
-                    "filtered":  int(row.get("filtered", 0)),
-                    "extracted": int(row.get("extracted", 0)),
-                    "cards":     int(row.get("cards", 0)),
-                }
-    except Exception:
-        pass
-    # Live mode fallback
-    return {
-        "raw":       int(query("SELECT COUNT(*) AS n FROM raw_snippets")["n"].iloc[0]) if has_table("raw_snippets") else 0,
-        "filtered":  int(query("SELECT COUNT(*) AS n FROM filtered_snippets")["n"].iloc[0]) if has_table("filtered_snippets") else 0,
-        "extracted": int(query("SELECT COUNT(*) AS n FROM extracted_insights")["n"].iloc[0]) if has_table("extracted_insights") else 0,
-        "cards":     int(query("SELECT COUNT(*) AS n FROM insight_cards")["n"].iloc[0]) if has_table("insight_cards") else 0,
-    }
+def load_insights_v2() -> pd.DataFrame:
+    if not has_table("insights_v2"):
+        return pd.DataFrame()
+    return query("""
+        SELECT id, theme_id, theme, taxonomy_version, hypothesis, one_line, detailed,
+               suggested_experiment, part_2_probe,
+               confidence, validation_status, critic_verdict, critic_notes,
+               confidence_breakdown
+        FROM insights_v2
+        ORDER BY confidence DESC NULLS LAST
+    """)
 
 
+@st.cache_data(ttl=300)
+def load_corpus_hypotheses() -> pd.DataFrame:
+    if not has_table("corpus_hypotheses"):
+        return pd.DataFrame()
+    return query("""
+        SELECT rank, title, claim, reasoning, grounded_in,
+               counter_evidence_that_would_disprove, confidence, novelty,
+               implication_for_zepto, interview_probe,
+               top_line_read, what_this_corpus_cannot_answer,
+               recommended_next_data_collection
+        FROM corpus_hypotheses ORDER BY rank
+    """)
+
+
+@st.cache_data(ttl=300)
+def load_v1_cards() -> pd.DataFrame:
+    if not has_table("insight_cards"):
+        return pd.DataFrame()
+    return query("SELECT * FROM insight_cards ORDER BY confidence DESC")
+
+
+@st.cache_data(ttl=300)
+def load_v3_cards() -> pd.DataFrame:
+    if not has_table("insight_cards_v3"):
+        return pd.DataFrame()
+    return query("SELECT * FROM insight_cards_v3 ORDER BY confidence DESC")
+
+
+# ==================================================================
+# Page header
+# ==================================================================
 st.title("Zepto AI-Powered Discovery Engine")
-st.caption("Systematically surfacing *why* Zepto users stay in habit loops and rarely try new categories.")
-if is_demo_mode():
-    st.info("📦 **Demo mode** — reading pre-computed snapshots. See the [source repo](https://github.com/rushilv698/Zepto---Nextleap-Grad-project-1-) for the live pipeline.")
-
-with st.sidebar:
-    st.header("Pipeline stats")
-    try:
-        c = counts()
-        st.metric("Raw snippets",       f"{c['raw']:,}")
-        st.metric("Filtered relevant",  f"{c['filtered']:,}")
-        st.metric("Extracted insights", f"{c['extracted']:,}")
-        st.metric("Insight cards",      f"{c['cards']:,}")
-    except Exception as e:
-        st.error(f"Stats unavailable: {e}")
-
-tab_v2, tab0, tab1, tab2, tab_v3, tab3, tab4 = st.tabs(
-    ["v2 Themes + Insights (validated)", "Corpus hypotheses (reasoning)",
-     "Strategic Q&A", "Insight cards (v1)", "Insight cards (v3, adversarial)",
-     "Trends", "Raw explorer"]
+st.caption(
+    "Strategic goal: increase the % of Monthly Active Customers who purchase from "
+    "at least one new category every month. This engine ingests public user "
+    "feedback at scale, filters it, discovers themes, generates hypotheses, and "
+    "validates them through multiple independent checks."
 )
+if is_demo_mode():
+    st.info(
+        "📦 **Demo mode** — reading pre-computed snapshots. "
+        "See the [source repo](https://github.com/rushilv698/Zepto---Nextleap-Grad-project-1-) "
+        "for the live pipeline."
+    )
 
-# ------------- v2 THEMES + VALIDATED INSIGHTS -----------------
-with tab_v2:
-    st.markdown("### v2 pipeline — evolving taxonomy + multi-layer validated insights")
-    st.caption("Per PDF methodology. Themes emerge dynamically (seed → grow → consolidate); "
-               "each insight is scored on 5 automated validation layers + LLM critic; behavioural "
-               "and business/experiment validation are honestly marked as gaps.")
+TOTALS = load_totals()
+
+# ==================================================================
+# Tabs (in the exact order the user asked for)
+# ==================================================================
+tab_dash, tab_raw, tab_filter, tab_themes, tab_insights, tab_quality = st.tabs([
+    "📊 Dashboard",
+    "🗂️ Raw data acquired",
+    "🚿 Filtered data",
+    "🧩 Themes generated",
+    "💡 Insights generated",
+    "✅ Quality validated",
+])
+
+
+# ==================================================================
+# 1) DASHBOARD — final insight cards + confidence
+# ==================================================================
+with tab_dash:
+    st.markdown("### The story — best insights across every method, ranked by confidence")
+    st.caption(
+        "This engine ran **four synthesis approaches in parallel** so results could be compared. "
+        "The best output — Reasoning Layer hypotheses + v2.1 expansion-focused insights — is shown below."
+    )
+
+    hyps = load_corpus_hypotheses()
+    v2 = load_insights_v2()
+    v2_1 = v2[v2["taxonomy_version"] == 2] if not v2.empty else pd.DataFrame()
+
+    # Top-line read
+    if not hyps.empty:
+        top_line = hyps["top_line_read"].iloc[0]
+        st.info(f"**Corpus top-line read:**  {top_line}")
+
+    # -- Reasoning layer: 5 hypotheses (direct answers to the goal)
+    if not hyps.empty:
+        st.markdown("#### 🎯 Reasoning-layer hypotheses  (whole-corpus inference — the *why*)")
+        for _, h in hyps.iterrows():
+            emoji = {"high": "🟢", "medium": "🟡", "low": "🔴"}.get(h["confidence"], "⚪")
+            nov = "✨ non-obvious" if h["novelty"] == "non_obvious" else "obvious"
+            with st.container(border=True):
+                st.subheader(f"#{h['rank']}  ·  {h['title']}  ·  {emoji} {h['confidence']}  ·  {nov}")
+                st.markdown(f"**Claim:** {h['claim']}")
+                with st.expander("Reasoning + counter-evidence check"):
+                    st.markdown(f"**Reasoning:** {h['reasoning']}")
+                    st.markdown(f"**Counter-evidence that would disprove:** {h['counter_evidence_that_would_disprove']}")
+                st.markdown(f"**Implication for Zepto:** {h['implication_for_zepto']}")
+                st.markdown(f"**Interview probe:** _{h['interview_probe']}_")
+
+    # -- v2.1 insights: expansion-focused, evidence-linked
+    if not v2_1.empty:
+        st.markdown("#### 🧭 v2.1 insights  (expansion-focused, evidence-linked)")
+        for _, r in v2_1.iterrows():
+            badge = {"confirmed": "🟢 confirmed", "exploratory": "🟡 exploratory",
+                     "shelved": "🔴 shelved", "revising": "🟠 revising"}.get(
+                     r["validation_status"], r["validation_status"])
+            with st.container(border=True):
+                st.subheader(f"{r['theme']}  ·  conf {r['confidence']:.0f}  ·  {badge}")
+                st.markdown(f"**Hypothesis:** {r['hypothesis']}")
+                if r["one_line"]:
+                    st.markdown(f"_{r['one_line']}_")
+                with st.expander("Detailed reasoning"):
+                    st.write(r["detailed"])
+                if r["suggested_experiment"]:
+                    st.markdown(f"**Suggested experiment:** {r['suggested_experiment']}")
+                if r["part_2_probe"]:
+                    st.markdown(f"**Interview probe:** _{r['part_2_probe']}_")
+
+    if hyps.empty and v2_1.empty:
+        st.warning("No insights yet.")
+
+
+# ==================================================================
+# 2) RAW DATA ACQUIRED
+# ==================================================================
+with tab_raw:
+    st.markdown("### Raw data acquired")
+    st.caption(
+        f"**{TOTALS['raw']:,} snippets** collected from four public sources across four Indian "
+        "quick-commerce brands. Data was captured over several weeks."
+    )
+
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Total snippets", f"{TOTALS['raw']:,}")
+    col2.metric("Sources", "4")
+    col3.metric("Brands", "4")
+    col4.metric("Languages", "en / hi / hinglish")
+
+    raw = load_raw_counts()
+
+    if not raw.empty:
+        # Source × Brand matrix
+        st.markdown("#### Breakdown by source × brand")
+        pivot = raw.pivot_table(index="source", columns="brand", values="n", fill_value=0)
+        pivot["TOTAL"] = pivot.sum(axis=1)
+        pivot.loc["TOTAL"] = pivot.sum(axis=0)
+        st.dataframe(pivot, use_container_width=True)
+
+        # Two charts side-by-side
+        c1, c2 = st.columns(2)
+        with c1:
+            by_source = raw.groupby("source", as_index=False)["n"].sum().sort_values("n", ascending=False)
+            st.plotly_chart(
+                px.pie(by_source, values="n", names="source", title="By source",
+                       hole=0.4),
+                use_container_width=True,
+            )
+        with c2:
+            by_brand = raw.groupby("brand", as_index=False)["n"].sum().sort_values("n", ascending=False)
+            st.plotly_chart(
+                px.pie(by_brand, values="n", names="brand", title="By brand",
+                       hole=0.4),
+                use_container_width=True,
+            )
+
+    st.markdown("#### How each source was collected")
+    st.markdown("""
+**📱 Play Store** *(direct library — Google Play internal API)*
+- Zepto (`com.zeptoconsumerapp`), Blinkit (`com.grofers.customerapp`), BigBasket (`com.bigbasket.mobileapp`), Swiggy Instamart (`in.swiggy.android`).
+- India, English, up to 5,000 newest reviews per app.
+
+**💬 Reddit** *(Apify actor `oAuCIx3ItNrs2okjQ`)*
+- 30 subreddits — r/Zepto, r/india, r/mumbai, r/bangalore, r/AskIndia, r/IndianStartups, r/IndianFood, r/IndiaInvestments, plus 22 more India-focused subs.
+- 25 deep search terms — `quick commerce india`, `10 minute delivery`, `kirana vs online`, `grocery habits`, `dhaba vs zomato`, etc.
+
+**📺 YouTube comments** *(youtube-comment-downloader — free)*
+- 36 curated videos: Zepto Cafe launch, WTF podcast with Aadit Palicha, comparison reviews, business-model breakdowns, grocery hauls, founder interviews.
+- Up to 300 popular comments per video.
+
+**📰 News + business media** *(BeautifulSoup + Google News RSS)*
+- 12 Zepto-focused queries fed through Google News RSS.
+- Real article URLs decoded and scraped — Inc42, YourStory, LiveMint, Business Standard, Moneycontrol, NDTV Profit, Hindu BusinessLine, and 15 more preferred publishers.
+
+**❌ Skipped sources (documented gaps)**
+- Twitter/X and App Store scrapers gated behind Apify paid plans.
+- Apple App Store direct endpoint is broken (Apple gated it in 2024).
+""")
+
+
+# ==================================================================
+# 3) FILTERED DATA
+# ==================================================================
+with tab_filter:
+    st.markdown("### Filtered data — 8-layer sequential filtration")
+    st.caption(
+        "Per the PDF methodology, every snippet flows through eight sequential filters. "
+        "Each filter is designed to remove a specific kind of noise or downweight low-value signal."
+    )
+
+    sq = load_snippet_quality()
+    if sq.empty:
+        st.warning("Filtration hasn't run yet.")
+    else:
+        # Funnel counts
+        raw = TOTALS["raw"]
+        lang_counted = int(sq["lang"].notna().sum())
+        spam = int(sq["is_spam"].fillna(False).sum())
+        irrelevant = int(((sq["is_spam"] == False) & (sq["is_relevant"] == False)).sum())
+        dupes = int(sq["dup_of"].notna().sum())
+        v2_keepers = int(((sq["is_spam"] == False) & (sq["is_relevant"] == True) & (sq["dup_of"].isna())).sum())
+        v2_1_keepers = int(((sq["is_spam"] == False) & (sq["dup_of"].isna()) &
+                            (sq["is_expansion_relevant"] == True)).sum())
+
+        # Funnel chart
+        st.markdown("#### Filtration funnel")
+        fig = go.Figure(go.Funnel(
+            y=[
+                "Raw scraped",
+                "Language detected + normalized",
+                "Not spam",
+                "Relevant to shopping behavior",
+                "Unique (not near-dup)",
+                "v2.1 — expansion-behavior only",
+            ],
+            x=[
+                raw,
+                lang_counted,
+                lang_counted - spam,
+                lang_counted - spam - irrelevant,
+                v2_keepers,
+                v2_1_keepers,
+            ],
+            textinfo="value+percent initial",
+        ))
+        fig.update_layout(margin=dict(l=0, r=0, t=0, b=0), height=380)
+        st.plotly_chart(fig, use_container_width=True)
+
+        # Per-layer explanation table
+        st.markdown("#### Per-layer detail")
+        rows = [
+            ("1. Language & Normalization",
+             "FastText language detection + brand-name canonicalization (Blinkit variants → 'blinkit', etc.). Non-en/hi rows kept but flagged.",
+             f"{lang_counted:,} rows classified"),
+            ("2. Spam & Bot Detection",
+             "Regex fast-path (Telegram handles, coupon codes, generic 'good app 👍') + DeepSeek LLM classifier on borderline rows.",
+             f"❌ {spam:,} dropped ({100*spam/raw:.1f}%)"),
+            ("3. Relevance Filter",
+             "Legacy keyword+brand check + DeepSeek verifies each snippet is really about *shopping behavior, discovery, habits* — not just operational bugs.",
+             f"❌ {irrelevant:,} more dropped as irrelevant"),
+            ("4. Semantic Deduplication",
+             "Cosine similarity ≥ 0.95 against every previous embedding (OpenAI text-embedding-3-small). Earliest snippet kept.",
+             f"❌ {dupes:,} near-duplicates flagged ({100*dupes/raw:.1f}%)"),
+            ("5. Behaviour Filter",
+             "7 boolean flags per snippet: describes routine, repeat_purchase, exploration, trust, hesitation, price_sensitivity, decision_process.",
+             "Weighting input"),
+            ("6. Specificity Filter",
+             "1–5 rating on how detailed the review is. 'Good app' scores 1; a specific product complaint scores 5.",
+             "Weighting input"),
+            ("7. Information Value Score",
+             "Composite: 0.30·specificity + 0.20·novelty + 0.20·behavioural + 0.15·clarity + 0.15·actionability.",
+             f"{int(sq['info_value_score'].notna().sum()):,} rows scored"),
+            ("8. Temporal / Regional weighting",
+             "Recency decay (half-life 180d) + city-inferred where possible. Applied at theme-scoring, not filtration.",
+             "Downstream weight"),
+        ]
+        st.dataframe(
+            pd.DataFrame(rows, columns=["Layer", "What it does", "Result"]),
+            hide_index=True, use_container_width=True,
+        )
+
+        # Two keeper universes
+        st.markdown("#### Two candidate universes")
+        c1, c2 = st.columns(2)
+        c1.metric("v2 keepers (broad relevance)", f"{v2_keepers:,}",
+                  help="All snippets that survive filters 1–4. Used for the general v2 pipeline run.")
+        c2.metric("v2.1 keepers (expansion-only)", f"{v2_1_keepers:,}",
+                  help="Restricted to snippets whose behaviour_flags describe exploration / hesitation / decision-process. Directly on the MAC-per-new-category goal.")
+
+
+# ==================================================================
+# 4) THEMES GENERATED
+# ==================================================================
+with tab_themes:
+    st.markdown("### Themes generated — evolving taxonomy")
+    st.caption(
+        "Themes emerge dynamically (seed → grow → consolidate) rather than being pre-defined. "
+        "12 seed themes are generated from a 200-review sample; new snippets that don't match are "
+        "pooled and periodically clustered into new themes. Every 500 assignments, near-duplicate themes are merged."
+    )
+
     tax_v = st.radio(
         "Taxonomy version",
         options=[1, 2],
-        format_func=lambda v: {1: "v2 (all keepers, 910 rows)", 2: "v2.1 (expansion-only, 546 rows)"}[v],
+        format_func=lambda v: {1: "v2 (all keepers)", 2: "v2.1 (expansion-only)"}[v],
         horizontal=True,
-        help="v2.1 is the focused rerun using ONLY snippets whose behaviour_flags describe "
-             "exploration / hesitation / decision-process — directly on the MAC-per-new-category goal.",
     )
-    try:
-        if not has_table("insights_v2"):
-            st.info("v2 pipeline not yet run.")
-        else:
-            # Corpus health
-            try:
-                q = query("""
-                    SELECT COALESCE(CAST(is_spam AS VARCHAR), 'null') AS is_spam,
-                           COALESCE(CAST(is_relevant AS VARCHAR), 'null') AS is_relevant,
-                           CASE WHEN dup_of IS NOT NULL THEN 'dup' ELSE 'unique' END AS dedup,
-                           COUNT(*) AS n
-                    FROM snippet_quality GROUP BY 1,2,3 ORDER BY 4 DESC
-                """)
-                if not q.empty:
-                    st.subheader("Filtration funnel")
-                    st.dataframe(q, hide_index=True)
-            except Exception:
-                pass
 
-            # Theme taxonomy summary
-            th = query("""
-                SELECT t.id, t.name, t.definition, t.status, t.parent_id,
-                       (SELECT name FROM themes p WHERE p.id = t.parent_id) AS parent_name,
-                       (SELECT COUNT(*) FROM review_themes rt WHERE rt.theme_id = t.id
-                          AND rt.taxonomy_version = :v) AS members
-                FROM themes t
-                WHERE t.merged_into IS NULL AND t.taxonomy_version = :v
-                ORDER BY parent_id NULLS FIRST, members DESC
-            """, params={"v": int(tax_v)})
-            if not th.empty:
-                st.subheader(f"Taxonomy v{tax_v} — {len(th)} themes")
-                st.dataframe(th[["id", "name", "status", "parent_name", "members", "definition"]],
-                             hide_index=True, use_container_width=True)
-            else:
-                st.info("No themes at this version yet.")
+    th = load_themes_and_members(tax_v)
+    if th.empty:
+        st.info("No themes yet at this version.")
+    else:
+        n_parents = int(th["parent_id"].isna().sum())
+        n_leaves = int(th["parent_id"].notna().sum())
+        promoted = int((th["status"] == "promoted").sum())
 
-            # Insights
-            ins = query("""
-                SELECT id, theme_id, theme, hypothesis, one_line, detailed,
-                       suggested_experiment, part_2_probe,
-                       confidence, validation_status, critic_verdict, critic_notes,
-                       confidence_breakdown
-                FROM insights_v2
-                WHERE taxonomy_version = :v
-                ORDER BY confidence DESC NULLS LAST
-            """, params={"v": int(tax_v)})
-            if ins.empty:
-                st.info("No insights at this version.")
-            else:
-                st.subheader(f"Insights — {len(ins)} generated")
-                statuses = ["(any)"] + sorted(ins["validation_status"].dropna().unique().tolist())
-                verdicts = ["(any)"] + sorted(ins["critic_verdict"].dropna().unique().tolist())
-                col1, col2, col3 = st.columns(3)
-                with col1: st_pick = st.selectbox("Status", statuses, key=f"v2_status_{tax_v}")
-                with col2: v_pick = st.selectbox("Critic verdict", verdicts, key=f"v2_verdict_{tax_v}")
-                with col3: min_c = st.slider("Min confidence", 0, 100, 30, key=f"v2_conf_{tax_v}")
-                f = ins[ins["confidence"].fillna(0) >= min_c]
-                if st_pick != "(any)": f = f[f["validation_status"] == st_pick]
-                if v_pick != "(any)": f = f[f["critic_verdict"] == v_pick]
-                for _, r in f.iterrows():
-                    badge = {"confirmed": "🟢 confirmed", "exploratory": "🟡 exploratory",
-                             "shelved": "🔴 shelved", "revising": "🟠 revising"}.get(r["validation_status"], r["validation_status"])
-                    with st.container(border=True):
-                        st.subheader(f"{r['theme']}  ·  conf {r['confidence']:.0f}  ·  {badge}")
-                        st.markdown(f"**Hypothesis:** {r['hypothesis']}")
-                        if r["one_line"]:
-                            st.markdown(f"_{r['one_line']}_")
-                        st.write(r["detailed"])
-                        if r["suggested_experiment"]:
-                            st.markdown(f"**Experiment:** {r['suggested_experiment']}")
-                        if r["part_2_probe"]:
-                            st.markdown(f"**Interview probe:** {r['part_2_probe']}")
-                        if r["critic_notes"]:
-                            with st.expander(f"LLM critic verdict: {r['critic_verdict']}"):
-                                st.write(r["critic_notes"])
-                        bd = r["confidence_breakdown"]
-                        if bd:
-                            try:
-                                b = bd if isinstance(bd, dict) else json.loads(bd)
-                                with st.expander("Validation breakdown"):
-                                    st.json(b)
-                            except Exception:
-                                pass
-    except Exception as e:
-        st.error(f"v2 tab failed: {e}")
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Total themes", len(th))
+        c2.metric("Parent buckets", n_parents)
+        c3.metric("Leaf themes", n_leaves)
+        c4.metric("Emergent (DBSCAN-promoted)", promoted)
+
+        # Bar chart: themes by member count
+        st.markdown("#### Themes by supporting-review count")
+        leaves = th[th["members"] > 0].sort_values("members", ascending=True).tail(20)
+        if not leaves.empty:
+            fig = px.bar(
+                leaves, x="members", y="name", color="parent_name",
+                orientation="h",
+                labels={"members": "# supporting reviews", "name": "theme"},
+                height=500,
+            )
+            fig.update_layout(yaxis=dict(tickmode="linear"), margin=dict(l=0, r=0, t=10, b=0))
+            st.plotly_chart(fig, use_container_width=True)
+
+        # Hierarchical view
+        st.markdown("#### Hierarchy — parent buckets → leaf themes")
+        parents = th[th["parent_id"].isna()]
+        for _, p in parents.iterrows():
+            children = th[th["parent_id"] == p["id"]].sort_values("members", ascending=False)
+            total_members = int(children["members"].sum())
+            with st.expander(f"📂 **{p['name']}**  ·  {len(children)} themes  ·  {total_members} supporting reviews", expanded=(total_members > 20)):
+                if p["definition"]:
+                    st.caption(p["definition"])
+                for _, c in children.iterrows():
+                    badge = "🌱 seed" if c["status"] == "seed" else "✨ promoted"
+                    st.markdown(f"- **{c['name']}**  ·  {c['members']} reviews  ·  {badge}")
+                    if c["definition"]:
+                        st.caption(f"  _{c['definition']}_")
+
+        # Full table for review
+        with st.expander("All themes as a table"):
+            st.dataframe(
+                th[["id", "name", "status", "parent_name", "members", "definition"]],
+                hide_index=True, use_container_width=True,
+            )
 
 
-# ------------- Corpus hypotheses (reasoning layer) --------------
-with tab0:
-    st.markdown("### Reasoning layer output — hypotheses inferred *across the whole corpus*")
-    st.caption("Different in kind from insight cards: this asked GPT-4.1 to reason about the corpus as a whole, including inferring signal from what's ABSENT.")
-    try:
-        top_df = query(
-            "SELECT DISTINCT top_line_read, what_this_corpus_cannot_answer, recommended_next_data_collection "
-            "FROM corpus_hypotheses LIMIT 1"
-        )
-        top = None if top_df.empty else top_df.iloc[0]
-        hyps = query(
-            "SELECT rank, title, claim, reasoning, grounded_in, "
-            "counter_evidence_that_would_disprove, confidence, novelty, "
-            "implication_for_zepto, interview_probe "
-            "FROM corpus_hypotheses ORDER BY rank"
-        )
-        if top is not None:
-            st.info(f"**Top-line read:** {top['top_line_read']}")
+# ==================================================================
+# 5) INSIGHTS GENERATED
+# ==================================================================
+with tab_insights:
+    st.markdown("### Insights generated")
+    st.caption(
+        "For every theme with ≥ 5 supporting reviews, DeepSeek generated a hypothesis with cited "
+        "evidence, a suggested 2-week experiment, and an interview probe. Reasoning-layer hypotheses "
+        "were generated separately by GPT-4.1 reasoning across the entire corpus."
+    )
+
+    hyps = load_corpus_hypotheses()
+    v2 = load_insights_v2()
+    v1 = load_v1_cards()
+    v3 = load_v3_cards()
+
+    total = len(hyps) + len(v2) + len(v1) + len(v3)
+    c1, c2, c3, c4, c5 = st.columns(5)
+    c1.metric("Total insights", total)
+    c2.metric("Reasoning-layer", len(hyps))
+    c3.metric("v2 (broad)", int((v2["taxonomy_version"] == 1).sum()) if not v2.empty else 0)
+    c4.metric("v2.1 (expansion)", int((v2["taxonomy_version"] == 2).sum()) if not v2.empty else 0)
+    c5.metric("v1 + v3 baselines", len(v1) + len(v3))
+
+    method = st.selectbox(
+        "Show insights from",
+        options=["v2.1 (expansion-focused)", "v2 (broad)",
+                 "Reasoning layer", "v3 (adversarial baseline)", "v1 (simple baseline)"],
+    )
+
+    if method.startswith("Reasoning"):
         if hyps.empty:
-            st.warning("No corpus hypotheses yet.")
+            st.info("No reasoning-layer hypotheses.")
         else:
             for _, h in hyps.iterrows():
                 emoji = {"high": "🟢", "medium": "🟡", "low": "🔴"}.get(h["confidence"], "⚪")
-                nov_tag = "✨ non-obvious" if h["novelty"] == "non_obvious" else "obvious"
                 with st.container(border=True):
-                    st.subheader(f"#{h['rank']}  ·  {h['title']}  ·  {emoji} {h['confidence']}  ·  {nov_tag}")
+                    st.subheader(f"#{h['rank']}  ·  {h['title']}  ·  {emoji} {h['confidence']}")
                     st.markdown(f"**Claim:** {h['claim']}")
                     st.markdown(f"**Reasoning:** {h['reasoning']}")
-                    gi = h["grounded_in"]
-                    if gi:
-                        try:
-                            items = gi if isinstance(gi, list) else json.loads(gi)
-                            st.markdown("**Grounded in:** " + " · ".join(f"`{x}`" for x in items))
-                        except Exception:
-                            pass
-                    st.markdown(f"**Counter-evidence that would disprove:** {h['counter_evidence_that_would_disprove']}")
-                    st.markdown(f"**Implication for Zepto:** {h['implication_for_zepto']}")
+                    st.markdown(f"**Implication:** {h['implication_for_zepto']}")
                     st.markdown(f"**Interview probe:** _{h['interview_probe']}_")
-        if top is not None:
-            with st.expander("Honest limits of this corpus"):
-                st.markdown(f"**Can't answer:** {top['what_this_corpus_cannot_answer']}")
-                st.markdown(f"**Recommended next data:** {top['recommended_next_data_collection']}")
-    except Exception as e:
-        st.error(f"Failed to load hypotheses: {e}")
 
-
-# ------------- Strategic Q&A -----------------
-STRATEGIC_QS = [
-    ("Why do users repeatedly buy from the same categories?",
-     lambda df: df[df["intent"] == "Repeat_Purchase_Habit"]),
-    ("What prevents users from exploring new categories?",
-     lambda df: df[df["intent"] == "Exploration_Blocker"]),
-    ("What role do habits play in shopping behavior?",
-     lambda df: df[df["themes"].apply(lambda t: t is not None and "habit_loop" in (t if isinstance(t, list) else json.loads(t) if isinstance(t, str) and t.startswith('[') else []))]),
-    ("What information do users need before trying a new category?",
-     lambda df: df[df["themes"].apply(lambda t: t is not None and "information_gap" in (t if isinstance(t, list) else json.loads(t) if isinstance(t, str) and t.startswith('[') else []))]),
-    ("What frustrations emerge repeatedly?",
-     lambda df: df[df["emotional_tone"].isin(["frustration", "anger"])]),
-    ("Which user segments are more likely to experiment?",
-     lambda df: df[df["intent"].isin(["Discovery_Request", "Unmet_Need"])]),
-    ("What unmet needs emerge consistently across discussions?",
-     lambda df: df[df["intent"] == "Unmet_Need"]),
-    ("How do users discover products today?",
-     lambda df: df[df["themes"].apply(lambda t: t is not None and "discovery_UI" in (t if isinstance(t, list) else json.loads(t) if isinstance(t, str) and t.startswith('[') else []))]),
-]
-
-with tab1:
-    try:
-        ex = load_extracted()
-        for q_text, filt in STRATEGIC_QS:
-            with st.expander(q_text, expanded=False):
-                sub = filt(ex)
-                st.write(f"**{len(sub)} snippets matched**")
-                if len(sub) == 0:
-                    st.info("No data yet.")
-                    continue
-                theme_counter = Counter()
-                for lst in sub["themes"].dropna():
-                    if isinstance(lst, str):
-                        try:
-                            lst = json.loads(lst)
-                        except Exception:
-                            lst = []
-                    if isinstance(lst, list):
-                        theme_counter.update(lst)
-                if theme_counter:
-                    tt = pd.DataFrame(theme_counter.most_common(8), columns=["theme", "count"])
-                    st.plotly_chart(px.bar(tt, x="theme", y="count"), use_container_width=True)
-                st.markdown("**Sample quotes:**")
-                for _, row in sub[sub["actionable_quote"] == True].head(5).iterrows():
-                    st.markdown(f"> {row['text'][:400]}\n> — *{row['source']}*")
-    except Exception as e:
-        st.error(f"Failed to load: {e}")
-
-
-# ------------- Insight cards v1 ------------------
-with tab2:
-    try:
-        cards = load_insight_cards()
-        if cards.empty:
-            st.info("No insight cards yet.")
+    elif method.startswith("v2 ") or method.startswith("v2.1"):
+        version = 2 if method.startswith("v2.1") else 1
+        sub = v2[v2["taxonomy_version"] == version] if not v2.empty else pd.DataFrame()
+        if sub.empty:
+            st.info("No insights at this version.")
         else:
-            personas = ["(any)"] + sorted(cards["persona_most_affected"].dropna().unique().tolist())
-            barriers = ["(any)"] + sorted(cards["primary_barrier"].dropna().unique().tolist())
-            col1, col2, col3 = st.columns(3)
-            with col1: p = st.selectbox("Persona", personas)
-            with col2: b = st.selectbox("Primary barrier", barriers)
-            with col3: min_conf = st.slider("Min confidence", 0, 100, 50)
-            f = cards[cards["confidence"] >= min_conf]
-            if p != "(any)": f = f[f["persona_most_affected"] == p]
-            if b != "(any)": f = f[f["primary_barrier"] == b]
-            st.write(f"**{len(f)} cards**")
-            for _, r in f.iterrows():
+            for _, r in sub.iterrows():
+                badge = {"confirmed": "🟢 confirmed", "exploratory": "🟡 exploratory",
+                         "shelved": "🔴 shelved", "revising": "🟠 revising"}.get(
+                         r["validation_status"], r["validation_status"])
                 with st.container(border=True):
-                    st.subheader(f"{r['title']}  ·  confidence {r['confidence']:.0f}")
-                    st.markdown(f"**{r['one_line']}**")
+                    st.subheader(f"{r['theme']}  ·  conf {r['confidence']:.0f}  ·  {badge}")
+                    st.markdown(f"**Hypothesis:** {r['hypothesis']}")
                     st.write(r["detailed"])
-                    cols = st.columns(3)
-                    cols[0].markdown(f"**Persona**: {r['persona_most_affected']}")
-                    cols[1].markdown(f"**Barrier**: {r['primary_barrier']}")
-                    cols[2].markdown(f"**Unique authors**: {r['unique_authors']}")
-                    if r["source_counts"]:
-                        try:
-                            sc = r["source_counts"] if isinstance(r["source_counts"], dict) else json.loads(r["source_counts"])
-                            st.caption(" · ".join(f"{k}: {v}" for k, v in sc.items()))
-                        except Exception:
-                            pass
-                    st.markdown(f"**Suggested experiment:** {r['suggested_experiment']}")
-    except Exception as e:
-        st.error(f"Failed to load: {e}")
+                    if r["suggested_experiment"]:
+                        st.markdown(f"**Experiment:** {r['suggested_experiment']}")
+                    if r["part_2_probe"]:
+                        st.markdown(f"**Interview probe:** _{r['part_2_probe']}_")
 
-
-# ------------- Insight cards v3 (adversarial) --------------
-with tab_v3:
-    st.caption("Same clustering + hypothesis + counter-evidence + Part-2 interview probes. Use these cards to write your Part 2 interview scripts.")
-    try:
-        v3 = query(
-            "SELECT id, title, hypothesis, detailed, persona_most_affected, primary_barrier, "
-            "supporting_evidence, counter_evidence_check, confidence_in_hypothesis, "
-            "suggested_experiment, part_2_interview_prompts, confidence, source_counts, "
-            "brand_counts, discovery_breakdown, unique_authors "
-            "FROM insight_cards_v3 ORDER BY confidence DESC"
-        )
+    elif method.startswith("v3"):
         if v3.empty:
-            st.warning("No v3 cards.")
+            st.info("No v3 cards.")
         else:
-            conf_h = ["(any)"] + sorted(v3["confidence_in_hypothesis"].dropna().unique().tolist())
-            personas = ["(any)"] + sorted(v3["persona_most_affected"].dropna().unique().tolist())
-            barriers = ["(any)"] + sorted(v3["primary_barrier"].dropna().unique().tolist())
-            col1, col2, col3, col4 = st.columns(4)
-            with col1: c_h = st.selectbox("Model confidence", conf_h, key="v3_ch")
-            with col2: p3 = st.selectbox("Persona", personas, key="v3_p")
-            with col3: b3 = st.selectbox("Barrier", barriers, key="v3_b")
-            with col4: min_conf3 = st.slider("Min confidence score", 0, 100, 50, key="v3_mc")
-            f = v3[v3["confidence"] >= min_conf3]
-            if c_h != "(any)": f = f[f["confidence_in_hypothesis"] == c_h]
-            if p3 != "(any)": f = f[f["persona_most_affected"] == p3]
-            if b3 != "(any)": f = f[f["primary_barrier"] == b3]
-            st.write(f"**{len(f)} cards**")
-            for _, r in f.iterrows():
+            for _, r in v3.iterrows():
                 emoji = {"high": "🟢", "medium": "🟡", "low": "🔴"}.get(r["confidence_in_hypothesis"], "⚪")
                 with st.container(border=True):
                     st.subheader(f"{r['title']}  ·  score {r['confidence']:.0f}  ·  {emoji} {r['confidence_in_hypothesis']}")
                     st.markdown(f"**Hypothesis:** {r['hypothesis']}")
                     st.write(r["detailed"])
-                    cols = st.columns(3)
-                    cols[0].markdown(f"**Persona**: {r['persona_most_affected']}")
-                    cols[1].markdown(f"**Barrier**: {r['primary_barrier']}")
-                    cols[2].markdown(f"**Unique authors**: {r['unique_authors']}")
-                    if r["brand_counts"]:
-                        try:
-                            bc = r["brand_counts"] if isinstance(r["brand_counts"], dict) else json.loads(r["brand_counts"])
-                            st.caption("Brands: " + " · ".join(f"{k}: {v}" for k, v in bc.items()))
-                        except Exception:
-                            pass
-                    with st.expander("Supporting evidence"):
-                        st.write(r["supporting_evidence"])
-                    with st.expander("Counter-evidence check"):
-                        st.write(r["counter_evidence_check"])
                     st.markdown(f"**Suggested experiment:** {r['suggested_experiment']}")
-                    prompts = r["part_2_interview_prompts"]
-                    if prompts:
-                        try:
-                            qs = prompts if isinstance(prompts, list) else json.loads(prompts)
-                            st.markdown("**Part-2 interview probes:**")
-                            for q in qs:
-                                st.markdown(f"- _{q}_")
-                        except Exception:
-                            pass
-    except Exception as e:
-        st.error(f"Failed to load v3 cards: {e}")
 
-
-# ------------- Trends -------------------------
-with tab3:
-    try:
-        ex = load_extracted()
-        if ex.empty or ex["posted_at"].dropna().empty:
-            st.info("Not enough dated data yet.")
+    else:  # v1
+        if v1.empty:
+            st.info("No v1 cards.")
         else:
-            ex["day"] = pd.to_datetime(ex["posted_at"]).dt.date
-            counts_by_day_intent = ex.groupby(["day", "intent"]).size().reset_index(name="n")
-            st.plotly_chart(
-                px.line(counts_by_day_intent, x="day", y="n", color="intent",
-                        title="Signal volume by intent, over time"),
-                use_container_width=True,
-            )
-            # Explode themes for time-series
-            ex_copy = ex.copy()
-            ex_copy["themes_list"] = ex_copy["themes"].apply(
-                lambda t: t if isinstance(t, list) else (json.loads(t) if isinstance(t, str) and t.startswith('[') else [])
-            )
-            explode = ex_copy.explode("themes_list")
-            explode = explode[explode["themes_list"].notna()]
-            if not explode.empty:
-                byday = explode.groupby(["day", "themes_list"]).size().reset_index(name="n")
-                top = explode["themes_list"].value_counts().head(5).index.tolist()
-                byday = byday[byday["themes_list"].isin(top)]
-                st.plotly_chart(
-                    px.line(byday, x="day", y="n", color="themes_list", title="Top 5 barriers over time"),
-                    use_container_width=True,
-                )
-    except Exception as e:
-        st.error(f"Failed to load: {e}")
+            for _, r in v1.iterrows():
+                with st.container(border=True):
+                    st.subheader(f"{r['title']}  ·  confidence {r['confidence']:.0f}")
+                    st.markdown(f"**{r['one_line']}**")
+                    st.write(r["detailed"])
+                    st.markdown(f"**Suggested experiment:** {r['suggested_experiment']}")
 
 
-# ------------- Raw explorer -------------------
-with tab4:
-    try:
-        ex = load_extracted()
-        q_str = st.text_input("Search text (substring)")
-        source_opts = ["(all)"] + sorted(ex["source"].dropna().unique().tolist())
-        s = st.selectbox("Source", source_opts)
-        f = ex
-        if q_str: f = f[f["text"].str.contains(q_str, case=False, na=False)]
-        if s != "(all)": f = f[f["source"] == s]
-        st.write(f"**{len(f)} rows**")
-        st.dataframe(
-            f[["source", "posted_at", "intent", "user_persona", "category_currently_buying",
-               "category_avoiding", "emotional_tone", "barrier_summary", "text"]].head(500),
-            use_container_width=True, height=600,
+# ==================================================================
+# 6) QUALITY VALIDATED
+# ==================================================================
+with tab_quality:
+    st.markdown("### Insight quality — multi-layer validation")
+    st.caption(
+        "Every v2 insight was scored on 5 automated validation layers plus a separate LLM Critic Agent "
+        "(different model from the generator) that reviewed each insight against retrieved counter-evidence. "
+        "Behavioural + Business-experiment validation are honestly flagged as `not_evaluated` (require internal analytics)."
+    )
+
+    v2 = load_insights_v2()
+    if v2.empty:
+        st.warning("No v2 insights yet.")
+    else:
+        # Explain the checks
+        st.markdown("#### The five automated checks")
+        checks = pd.DataFrame(
+            [
+                ("Evidence", "≥ 5 supporting review IDs must be cited by the LLM.",
+                 "insights below threshold shelved"),
+                ("Cross-source", "Evidence must span ≥ 2 sources AND ≥ 2 brands.",
+                 "confirmed only if diverse enough"),
+                ("Statistical", "Theme must have ≥ 20 unique authors AND ≥ 0.5% of corpus.",
+                 "prevents fringe hypotheses"),
+                ("Cluster quality", "Theme intra-cluster mean cosine ≥ 0.70.",
+                 "signal is coherent"),
+                ("LLM Critic Agent", "GPT-4.1 reviews DeepSeek's output + 10 retrieved counter-quotes.",
+                 "pass / revise / reject verdict"),
+            ],
+            columns=["Layer", "Rule", "Enforcement"],
         )
-    except Exception as e:
-        st.error(f"Failed to load: {e}")
+        st.dataframe(checks, hide_index=True, use_container_width=True)
+
+        # Compute validation matrix
+        rows = []
+        for _, r in v2.iterrows():
+            bd = _parse_json(r["confidence_breakdown"]) or {}
+            rows.append({
+                "id": r["id"],
+                "theme": r["theme"],
+                "confidence": r["confidence"],
+                "status": r["validation_status"],
+                "evidence_pass": "✓" if bd.get("evidence_pass") else "✗",
+                "cross_source_pass": "✓" if bd.get("cross_source_pass") else "✗",
+                "n_sources": bd.get("evidence_source_count", "-"),
+                "n_brands": bd.get("evidence_brand_count", "-"),
+                "statistical_pass": "✓" if bd.get("statistical_pass") else "✗",
+                "unique_authors": bd.get("unique_authors", "-"),
+                "cluster_quality_pass": "✓" if bd.get("cluster_quality_pass") else "✗",
+                "intra_cosine": bd.get("intra_cluster_sim", "-"),
+                "critic_verdict": bd.get("critic_verdict") or r["critic_verdict"] or "-",
+            })
+        vm = pd.DataFrame(rows)
+
+        # Aggregate: how many usable
+        n_total = len(vm)
+        n_confirmed = int((vm["status"] == "confirmed").sum())
+        n_exploratory = int((vm["status"] == "exploratory").sum())
+        n_shelved = int((vm["status"] == "shelved").sum())
+        n_critic_pass = int((vm["critic_verdict"] == "pass").sum())
+        n_critic_revise = int((vm["critic_verdict"] == "revise").sum())
+        n_critic_reject = int((vm["critic_verdict"] == "reject").sum())
+
+        st.markdown("#### Final ranking of insights")
+        st.dataframe(
+            vm[["id", "theme", "confidence", "status", "evidence_pass", "cross_source_pass",
+                "n_sources", "n_brands", "statistical_pass", "unique_authors",
+                "cluster_quality_pass", "intra_cosine", "critic_verdict"]],
+            hide_index=True, use_container_width=True,
+        )
+
+        # Usability summary
+        st.markdown("#### Usability summary")
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Total insights", n_total)
+        c2.metric("🟢 Confirmed (all hard checks + critic PASS)", n_confirmed)
+        c3.metric("🟡 Exploratory (some checks miss OR critic REVISE)", n_exploratory)
+        c4.metric("🔴 Shelved (fails hard OR critic REJECT)", n_shelved)
+
+        st.markdown("#### LLM Critic verdicts")
+        c1, c2, c3 = st.columns(3)
+        c1.metric("PASS", n_critic_pass)
+        c2.metric("REVISE", n_critic_revise)
+        c3.metric("REJECT", n_critic_reject)
+
+        # What's honestly missing
+        st.markdown("#### Honest gaps in validation")
+        st.warning(
+            "**Behavioural validation** (recommendation CTR, category visits, repeat purchases) and "
+            "**Business & Experiment validation** (A/B test uplift) require Zepto internal analytics we "
+            "don't have access to. These layers are flagged `not_evaluated` and `deferred_to_part_4` "
+            "in every insight's confidence breakdown — not silently skipped."
+        )
+
+        # How to use
+        st.markdown("#### How to use these insights")
+        if n_confirmed > 0:
+            st.success(f"**{n_confirmed} insights** cleared all hard checks. Use them as primary drivers.")
+        if n_exploratory > 0:
+            st.info(
+                f"**{n_exploratory} insights** are exploratory — the signal is real but needs one more "
+                "layer of evidence. **These are the ideal Part 2 interview subjects** — the pipeline "
+                "already generated open-ended interview probes for each."
+            )
+        if n_shelved > 0:
+            st.error(
+                f"**{n_shelved} insights** were shelved by the critic — treated as noise. Kept in the "
+                "table for transparency, but should not drive product decisions."
+            )
