@@ -734,15 +734,11 @@ the Dashboard.
             n_parents = n_leaves = n_eligible = n_thin = 0
 
         st.markdown("#### From themes to insights")
-        c1, c2, c3, c4 = st.columns(4)
-        c1.metric("Themes total", n_parents + n_leaves,
-                  help="Parent buckets + leaf themes combined (see Themes tab).")
-        c2.metric("Parent buckets", n_parents, delta="0 direct members", delta_color="off",
-                  help="Organizing shelves — their children carry the reviews.")
-        c3.metric(f"Leaf themes with ≥ 5 reviews", n_eligible,
-                  help="Only leaf themes with enough supporting reviews qualify for insight generation.")
-        c4.metric("Insights generated", len(insights),
-                  help="One insight per eligible leaf theme.")
+        c1, c2 = st.columns(2)
+        c1.metric("Total themes", n_parents + n_leaves,
+                  help="Parent buckets + leaf themes combined (see Themes tab). Every theme is a candidate for an insight.")
+        c2.metric("Insights with supporting evidence ≥ 5", len(insights),
+                  help="Only themes with at least 5 supporting reviews qualify — the rest would fail the downstream Evidence check anyway. See the expander below for the full reasoning.")
 
         with st.expander("Why don't ALL themes get an insight?", expanded=False):
             st.markdown(f"""
