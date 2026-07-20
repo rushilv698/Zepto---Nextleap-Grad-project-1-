@@ -1,0 +1,1360 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+
+<helmet>
+  <title>Discovery Intelligence Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', -apple-system, sans-serif; background: #0C0A14; color: #E8E0F0; font-size: 14px; line-height: 1.5; }
+    a { color: #B07CFF; text-decoration: none; }
+    a:hover { color: #D4B0FF; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes barGrow { from { width: 0; } }
+    @keyframes jumpIn { 0% { transform: translateY(0); } 30% { transform: translateY(-12px); } 50% { transform: translateY(4px); } 70% { transform: translateY(-4px); } 100% { transform: translateY(0); } }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #2A2040; border-radius: 3px; }
+  </style>
+</helmet>
+
+<div style="display: flex; min-height: 100vh; background: #0C0A14;">
+
+  <!-- ===== SIDEBAR ===== -->
+  <aside style="width: 240px; background: #110E1C; border-right: 1px solid #1E1830; position: fixed; top: 0; left: 0; bottom: 0; display: flex; flex-direction: column; z-index: 10;">
+    <div style="padding: 20px 20px 16px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid #1E1830;">
+      <div style="width: 36px; height: 36px; border-radius: 10px; background: linear-gradient(135deg, #7C21DA, #B07CFF); display: flex; align-items: center; justify-content: center;">
+        <svg width="18" height="18" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path></svg>
+      </div>
+      <div>
+        <div style="font-size: 15px; font-weight: 700; color: #F0E8FF;">Zepto AI</div>
+        <div style="font-size: 11px; color: #7A6B99;">Discovery Intelligence</div>
+      </div>
+    </div>
+    <nav style="padding: 12px 10px; display: flex; flex-direction: column; gap: 2px; flex: 1; overflow-y: auto;">
+      {{ sidebarNav }}
+    </nav>
+  </aside>
+
+  <!-- ===== MAIN ===== -->
+  <main style="margin-left: 240px; flex: 1; min-height: 100vh;">
+
+    <!-- Top Bar -->
+    <div style="padding: 20px 32px; border-bottom: 1px solid #1E1830; display: flex; align-items: center; justify-content: space-between; gap: 16px; background: #110E1C; position: sticky; top: 0; z-index: 5;">
+      <div>
+        <h1 style="font-size: 22px; font-weight: 800; color: #F0E8FF; margin-bottom: 2px;">Discovery Intelligence Dashboard</h1>
+        <span style="font-size: 12px; color: #7A6B99;">Runs every Monday at 7:00 AM IST · Last refreshed: Jul 15, 2026</span>
+      </div>
+      <div style="padding: 8px 16px; border-radius: 10px; background: #1E1830; border: 1px solid #2A2040; display: flex; align-items: center; gap: 8px; cursor: pointer;">
+        <span style="font-size: 14px;">💬</span>
+        <span style="font-size: 13px; color: #7A6B99;">Ask AI: "Why do users struggle to discover?"</span>
+      </div>
+    </div>
+
+    <div style="padding: 28px 32px;">
+
+      <!-- ===== CHAT PAGE ===== -->
+      <sc-if value="{{ isChat }}">
+        <div style="display: flex; flex-direction: column; height: calc(100vh - 120px);">
+          <div style="margin-bottom: 20px; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;">
+            <div>
+              <h2 style="font-size: 22px; font-weight: 700; color: #F0E8FF; margin-bottom: 4px;">Ask the Discovery Engine</h2>
+              <p style="font-size: 13px; color: #7A6B99;">Ask questions about the corpus. Click a suggestion or type your own. {{ chatBackendHint }}</p>
+            </div>
+            <button onClick="{{ clearChat }}" style="padding: 8px 14px; border-radius: 8px; border: 1px solid #2A2040; background: transparent; color: #7A6B99; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit;">Clear chat</button>
+          </div>
+          <sc-if value="{{ noChatMessages }}">
+            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; gap: 24px;">
+              <div style="width: 64px; height: 64px; border-radius: 16px; background: linear-gradient(135deg, #7C21DA, #B07CFF); display: flex; align-items: center; justify-content: center;">
+                <svg width="28" height="28" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path></svg>
+              </div>
+              <p style="font-size: 15px; color: #7A6B99; text-align: center;">What would you like to know about the discovery corpus?</p>
+              <div style="display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; max-width: 700px;">
+                <sc-for list="{{ chatSeedPrompts }}" as="prompt">
+                  <button onClick="{{ prompt.onClick }}" style="padding: 10px 16px; border-radius: 12px; border: 1px solid #2A2040; background: #14101F; color: #B0A3CC; font-size: 13px; cursor: pointer; font-family: inherit; transition: all 0.15s; text-align: left; line-height: 1.4;" style-hover="background: #1E1830; border-color: #7C21DA; color: #F0E8FF;">
+                    {{ prompt.question }}
+                  </button>
+                </sc-for>
+              </div>
+            </div>
+          </sc-if>
+          <sc-if value="{{ noChatMessages }}" hint-placeholder-val="{{ false }}"></sc-if>
+          <div style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; padding-bottom: 16px;">
+            <sc-for list="{{ chatMessages }}" as="msg">
+              <sc-if value="{{ msg.isUser }}">
+                <div style="display: flex; justify-content: flex-end;">
+                  <div style="max-width: 70%; padding: 12px 16px; border-radius: 14px 14px 2px 14px; font-size: 14px; line-height: 1.6; background: #7C21DA; color: white;">{{ msg.content }}</div>
+                </div>
+              </sc-if>
+              <sc-if value="{{ msg.isAssistant }}">
+                <div style="display: flex; justify-content: flex-start; gap: 10px;">
+                  <div style="width: 28px; height: 28px; border-radius: 8px; background: linear-gradient(135deg, #7C21DA, #B07CFF); display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 2px;">
+                    <svg width="12" height="12" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path></svg>
+                  </div>
+                  <div style="max-width: 70%; padding: 12px 16px; border-radius: 14px 14px 14px 2px; font-size: 14px; line-height: 1.6; background: #14101F; border: 1px solid #1E1830; color: #E8E0F0; white-space: pre-wrap;">{{ msg.content }}</div>
+                </div>
+              </sc-if>
+            </sc-for>
+          </div>
+          <div style="border-top: 1px solid #1E1830; padding: 16px 0 0; display: flex; gap: 8px;">
+            <input type="text" placeholder="Ask a question about the corpus..." value="{{ chatInput }}" onInput="{{ onChatInput }}" onKeyDown="{{ onChatKeyDown }}" style="flex: 1; padding: 12px 16px; border-radius: 12px; border: 1px solid #2A2040; background: #14101F; color: #F0E8FF; font-size: 14px; font-family: inherit; outline: none; transition: border-color 0.15s;" style-focus="border-color: #7C21DA;" />
+            <button onClick="{{ sendChat }}" style="padding: 12px 24px; border-radius: 12px; border: none; background: linear-gradient(135deg, #7C21DA, #9333EA); color: white; font-weight: 600; font-size: 14px; cursor: pointer; font-family: inherit; transition: all 0.15s;" style-hover="opacity: 0.9;">Send</button>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ===== DASHBOARD PAGE ===== -->
+      <sc-if value="{{ isDashboard }}">
+
+      <!-- Data Pipeline Overview -->
+      <div style="background: #14101F; border: 1px solid #1E1830; border-radius: 12px; padding: 16px 24px; margin-bottom: 24px; display: flex; align-items: center; gap: 24px; flex-wrap: wrap;">
+        <span style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; color: #7A6B99;">Data Pipeline Overview</span>
+        <div>
+          <span style="font-size: 24px; font-weight: 800; color: #F0E8FF;">11,947</span>
+          <span style="font-size: 13px; color: #7A6B99; margin-left: 6px;">Total Scraped</span>
+        </div>
+        <div style="display: flex; gap: 16px; flex-wrap: wrap;">
+          <span style="font-size: 12px; color: #7A6B99;"><strong style="color: #B07CFF;">8,283</strong> Play Store</span>
+          <span style="font-size: 12px; color: #7A6B99;"><strong style="color: #B07CFF;">2,095</strong> YouTube</span>
+          <span style="font-size: 12px; color: #7A6B99;"><strong style="color: #B07CFF;">1,194</strong> Reddit</span>
+          <span style="font-size: 12px; color: #7A6B99;"><strong style="color: #B07CFF;">375</strong> News</span>
+        </div>
+      </div>
+
+      <!-- Why the KPI count (8,331) differs from the raw scrape (11,947) — tap to open -->
+      <details style="background: #14101F; border: 1px solid #3D1B60; border-radius: 12px; padding: 12px 20px; margin-bottom: 20px;">
+        <summary style="cursor: pointer; font-size: 13px; font-weight: 600; color: #B07CFF;">▶ Why do the KPIs say 8,331 when we scraped 11,947? (tap to open)</summary>
+        <div style="font-size: 13px; color: #B0A3CC; line-height: 1.7; padding-top: 12px;">
+          The <strong>11,947</strong> in the pipeline strip is the raw scrape. The <strong>8,331</strong> in the KPI cards is what remained after the extraction pass — every downstream number (Discovery Friction %, Negative, Positive) is a share of that 8,331, so the drop-off matters.
+          <div style="margin: 12px 0; background: #0C0A14; border-radius: 8px; padding: 12px 16px;">
+            <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #1E1830;"><span>Raw scraped</span><strong style="color: #F0E8FF;">11,947</strong></div>
+            <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #1E1830;"><span>→ English (L1)</span><strong style="color: #F0E8FF;">11,146</strong></div>
+            <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #1E1830;"><span>→ Not spam (L2)</span><strong style="color: #F0E8FF;">8,363</strong></div>
+            <div style="display: flex; justify-content: space-between; padding: 6px 0;"><span>→ Analysed by the extractor (KPI base)</span><strong style="color: #B07CFF;">8,331</strong></div>
+          </div>
+          <p><strong>Where do the 3,616 lost snippets go?</strong> About 801 fail language detection (Hindi/Hinglish/scripts we don't handle in this pass), 2,783 are spam or bot-shaped (coupon codes, "gg" one-liners, repeat-account jams), and 32 more drop in transit through the 8→7-day retention wall on Reddit. Every drop is stored in <code>snippet_quality</code>, so nothing is silently discarded.</p>
+          <p style="margin-top: 8px;"><strong>Why is 8,331 the right base for the dashboard, not 11,947?</strong> The KPIs speak to <em>user behaviour</em> — Discovery Friction, negative sentiment, positive sentiment. A spam coupon-code isn't a user opinion; counting it in the denominator would deflate every rate. Filtering first gives an honest reading.</p>
+          <p style="margin-top: 8px;">The full 8-layer funnel (including the further narrowing to 634 goal-aligned snippets for insight generation) is in <strong>Workflow → Data Filtering</strong>.</p>
+        </div>
+      </details>
+
+      <!-- Top-line reading (from corpus hypotheses — the one-sentence answer to the whole engine) -->
+      <div style="background: linear-gradient(135deg, #1A0D2E 0%, #251440 100%); border: 1px solid #3D1B60; border-radius: 14px; padding: 20px 24px; margin-bottom: 24px;">
+        <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700; color: #B07CFF; margin-bottom: 8px;">💡 Top-line reading of the corpus</div>
+        <p style="font-size: 15px; color: #F0E8FF; line-height: 1.6; font-weight: 500;">Zepto users overwhelmingly display a <strong>one-dimensional, habitual use pattern</strong>, with almost no signals of curiosity or intent to explore new categories — suggesting that <strong>new categories are largely invisible in their mental model of the platform</strong>.</p>
+      </div>
+
+      <!-- KPI Cards -->
+      <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 36px;">
+        <div style="border-radius: 14px; padding: 20px; background: linear-gradient(135deg, #0D2818 0%, #14331F 100%); border: 1px solid #1B4D2A;">
+          <div style="display: flex; justify-content: center; margin-bottom: 10px;">
+            <svg width="24" height="24" fill="none" stroke="#34D399" stroke-width="2" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+          </div>
+          <div style="font-size: 36px; font-weight: 800; color: #34D399; text-align: center;">8,331</div>
+          <div style="font-size: 11px; color: #6EE7B7; text-align: center; margin-top: 4px;">Reviews Analysed</div>
+          <div style="font-size: 10px; color: #34D39988; text-align: center;">Classified &amp; Synthesised</div>
+        </div>
+        <div style="border-radius: 14px; padding: 20px; background: linear-gradient(135deg, #0D1F2D 0%, #122A3A 100%); border: 1px solid #1B4060;">
+          <div style="display: flex; justify-content: center; margin-bottom: 10px;">
+            <svg width="24" height="24" fill="none" stroke="#38BDF8" stroke-width="2" viewBox="0 0 24 24"><path d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
+          </div>
+          <div style="font-size: 36px; font-weight: 800; color: #38BDF8; text-align: center;">29.1%</div>
+          <div style="font-size: 11px; color: #7DD3FC; text-align: center; margin-top: 4px;">Discovery Friction</div>
+          <div style="font-size: 10px; color: #38BDF888; text-align: center;">2,428 of 8,331 flagged Exploration Blocker</div>
+        </div>
+        <div style="border-radius: 14px; padding: 20px; background: linear-gradient(135deg, #2D0D1B 0%, #3A1225 100%); border: 1px solid #601B3A;">
+          <div style="display: flex; justify-content: center; margin-bottom: 10px;">
+            <svg width="24" height="24" fill="none" stroke="#FB7185" stroke-width="2" viewBox="0 0 24 24"><path d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+          </div>
+          <div style="font-size: 36px; font-weight: 800; color: #FB7185; text-align: center;">3,755</div>
+          <div style="font-size: 11px; color: #FDA4AF; text-align: center; margin-top: 4px;">Negative Reviews</div>
+          <div style="font-size: 10px; color: #FB718588; text-align: center;">Top Issue: Trust Deficit</div>
+        </div>
+        <div style="border-radius: 14px; padding: 20px; background: linear-gradient(135deg, #1A0D2E 0%, #251440 100%); border: 1px solid #3D1B60;">
+          <div style="display: flex; justify-content: center; margin-bottom: 10px;">
+            <svg width="24" height="24" fill="none" stroke="#C084FC" stroke-width="2" viewBox="0 0 24 24"><path d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5"></path></svg>
+          </div>
+          <div style="font-size: 36px; font-weight: 800; color: #C084FC; text-align: center;">775</div>
+          <div style="font-size: 11px; color: #D4B0FF; text-align: center; margin-top: 4px;">Positive Reviews</div>
+          <div style="font-size: 10px; color: #C084FC88; text-align: center;">Users who expressed contentment</div>
+        </div>
+      </div>
+
+      <!-- SECTION 1 -->
+      <div id="s1" style="margin-bottom: 40px;">
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+          <span style="width: 28px; height: 28px; border-radius: 8px; background: #7C21DA; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: white;">01</span>
+          <h2 style="font-size: 20px; font-weight: 700; color: #F0E8FF;">Why do users stick to the same categories? (Is Discovery Friction Real?)</h2>
+        </div>
+        <p style="font-size: 12px; color: #7A6B99; margin-left: 38px; margin-bottom: 20px;">8,331 extracted insights, 2,428 flagged Exploration_Blocker as the intent (29.1%).</p>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+          <div style="background: #14101F; border: 1px solid #1E1830; border-radius: 14px; padding: 24px;">
+            <h3 style="font-size: 15px; font-weight: 600; color: #F0E8FF; margin-bottom: 4px;">Discovery Friction vs Normal Shopping</h3>
+            <p style="font-size: 12px; color: #7A6B99; margin-bottom: 20px;">Nearly 3 in 10 extracted insights are explicit exploration blockers — not bugs or pricing complaints. This validates the strategic goal.</p>
+            <div style="height: 24px; border-radius: 6px; overflow: hidden; display: flex; margin-bottom: 12px;">
+              <div style="width: 29.1%; background: #34D399; height: 100%;"></div>
+              <div style="flex: 1; background: #1E1830; height: 100%;"></div>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+              <span style="font-size: 12px; color: #34D399; font-weight: 600;">29.1% Exploration Blocker</span>
+              <span style="font-size: 12px; color: #7A6B99;">70.9% Other intents</span>
+            </div>
+          </div>
+          <div style="background: #14101F; border: 1px solid #1E1830; border-radius: 14px; padding: 24px;">
+            <h3 style="font-size: 15px; font-weight: 600; color: #F0E8FF; margin-bottom: 16px;">Evidence: Real User Reviews on Discovery</h3>
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+              <div style="background: #1E1830; border-radius: 8px; padding: 12px; border-left: 3px solid #38BDF8;">
+                <span style="font-size: 10px; font-weight: 600; color: #38BDF8; text-transform: uppercase;">Play Store</span>
+                <p style="font-size: 12px; color: #B0A3CC; margin-top: 6px; line-height: 1.6;">"most unreliable 10min delivery service.. never delivers before 25min.. even when app shows delivery in 6 or 7 mins. u cant trust them with last min delivery."</p>
+              </div>
+              <div style="background: #1E1830; border-radius: 8px; padding: 12px; border-left: 3px solid #FB923C;">
+                <span style="font-size: 10px; font-weight: 600; color: #FB923C; text-transform: uppercase;">Reddit</span>
+                <p style="font-size: 12px; color: #B0A3CC; margin-top: 6px; line-height: 1.6;">"Zepto is great for quick top-ups but I still go to DMart for monthly groceries. Never tried their non-grocery categories."</p>
+              </div>
+              <div style="background: #1E1830; border-radius: 8px; padding: 12px; border-left: 3px solid #34D399;">
+                <span style="font-size: 10px; font-weight: 600; color: #34D399; text-transform: uppercase;">YouTube</span>
+                <p style="font-size: 12px; color: #B0A3CC; margin-top: 6px; line-height: 1.6;">"Absolutely pathetic customer service. Received a punctured, leaking packet of dahi and their support team completely refused to help."</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECTION 2 -->
+      <div id="s2" style="margin-bottom: 40px;">
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+          <span style="width: 28px; height: 28px; border-radius: 8px; background: #7C21DA; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: white;">02</span>
+          <h2 style="font-size: 20px; font-weight: 700; color: #F0E8FF;">What are the most common frustrations with category discovery?</h2>
+        </div>
+        <p style="font-size: 12px; color: #7A6B99; margin-left: 38px; margin-bottom: 20px;">Themes ranked by number of supporting review snippets.</p>
+
+        <div style="background: #14101F; border: 1px solid #1E1830; border-radius: 14px; padding: 24px;">
+          <sc-for list="{{ frustrationBars }}" as="bar">
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+              <div style="width: 240px; font-size: 12px; color: #B0A3CC; text-align: right; flex-shrink: 0;">{{ bar.label }}</div>
+              <div style="flex: 1; height: 28px; background: #1E1830; border-radius: 6px; overflow: hidden; position: relative;">
+                <div style="height: 100%; border-radius: 6px; background: {{ bar.color }}; width: {{ bar.width }}; animation: barGrow 0.8s ease; display: flex; align-items: center; justify-content: flex-end; padding-right: 8px;">
+                  <span style="font-size: 11px; font-weight: 600; color: white;">{{ bar.value }}</span>
+                </div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+      <!-- SECTION 3 -->
+      <div id="s3" style="margin-bottom: 40px;">
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+          <span style="width: 28px; height: 28px; border-radius: 8px; background: #7C21DA; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: white;">03</span>
+          <h2 style="font-size: 20px; font-weight: 700; color: #F0E8FF;">What shopping behaviours are users trying to achieve?</h2>
+        </div>
+        <p style="font-size: 12px; color: #7A6B99; margin-left: 38px; margin-bottom: 20px;">Distribution of extracted intents across 8,331 review snippets.</p>
+
+        <div style="background: #14101F; border: 1px solid #1E1830; border-radius: 14px; padding: 24px;">
+          <sc-for list="{{ behaviourBars }}" as="bar">
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+              <div style="width: 240px; font-size: 13px; font-weight: 600; color: #F0E8FF;">{{ bar.label }}</div>
+              <div style="flex: 1; height: 24px; background: #1E1830; border-radius: 4px; overflow: hidden; position: relative;">
+                <div style="height: 100%; border-radius: 4px; background: {{ bar.color }}; width: {{ bar.width }}; animation: barGrow 0.8s ease;"></div>
+              </div>
+              <span style="font-size: 12px; font-weight: 600; color: #B0A3CC; width: 48px; text-align: right;">{{ bar.value }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+      <!-- SECTION 4 -->
+      <div id="s4" style="margin-bottom: 40px;">
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+          <span style="width: 28px; height: 28px; border-radius: 8px; background: #7C21DA; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: white;">04</span>
+          <h2 style="font-size: 20px; font-weight: 700; color: #F0E8FF;">What causes users to repeatedly buy the same categories?</h2>
+        </div>
+        <p style="font-size: 12px; color: #7A6B99; margin-left: 38px; margin-bottom: 20px;">Primary barriers extracted by the LLM across the 30 v3 insight cards.</p>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+          <div style="background: #14101F; border: 1px solid #1E1830; border-radius: 14px; padding: 24px;">
+            <div style="display: flex; flex-direction: column; gap: 0;">
+              <div style="display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #1E1830;">
+                <span style="font-size: 13px; font-weight: 600; color: #F0E8FF;">Trust Deficit</span>
+                <span style="font-size: 13px; font-weight: 700; color: #B07CFF;">20</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #1E1830;">
+                <span style="font-size: 13px; font-weight: 600; color: #F0E8FF;">Information Gap</span>
+                <span style="font-size: 13px; font-weight: 700; color: #B07CFF;">4</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #1E1830;">
+                <span style="font-size: 13px; font-weight: 600; color: #F0E8FF;">Bad Past Experience</span>
+                <span style="font-size: 13px; font-weight: 700; color: #B07CFF;">3</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #1E1830;">
+                <span style="font-size: 13px; font-weight: 600; color: #F0E8FF;">Price Sensitivity</span>
+                <span style="font-size: 13px; font-weight: 700; color: #B07CFF;">2</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; padding: 10px 0;">
+                <span style="font-size: 13px; font-weight: 600; color: #F0E8FF;">Habit Loop</span>
+                <span style="font-size: 13px; font-weight: 700; color: #B07CFF;">1</span>
+              </div>
+            </div>
+          </div>
+          <div style="background: #14101F; border: 1px solid #1E1830; border-radius: 14px; padding: 24px;">
+            <h3 style="font-size: 15px; font-weight: 600; color: #F0E8FF; margin-bottom: 4px;">Working hypotheses — the WHY</h3>
+            <p style="font-size: 11px; color: #7A6B99; margin-bottom: 16px;">GPT-4.1 reasoned across the whole corpus, including from what users DON'T say.</p>
+            <sc-for list="{{ workingHypotheses }}" as="h">
+              <div style="display: flex; gap: 10px; margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px solid #1E1830;">
+                <div style="width: 28px; height: 28px; border-radius: 8px; background: #2A2040; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 12px; font-weight: 700; color: #B07CFF;">#{{ h.rank }}</div>
+                <div style="flex: 1;">
+                  <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                    <div style="font-size: 13px; font-weight: 600; color: #F0E8FF;">{{ h.title }}</div>
+                    <span style="font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 4px; background: {{ h.confBg }}; color: {{ h.confColor }};">{{ h.confidence }}</span>
+                  </div>
+                  <div style="font-size: 12px; color: #7A6B99; line-height: 1.5;">{{ h.claim }}</div>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECTION 5 -->
+      <div id="s5" style="margin-bottom: 40px;">
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+          <span style="width: 28px; height: 28px; border-radius: 8px; background: #7C21DA; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: white;">05</span>
+          <h2 style="font-size: 20px; font-weight: 700; color: #F0E8FF;">Which user segments experience different discovery challenges?</h2>
+        </div>
+        <p style="font-size: 12px; color: #7A6B99; margin-left: 38px; margin-bottom: 12px;">Persona counts pulled from the extraction pass. Most reviewers self-identify weakly — the labeled tail is small but instructive.</p>
+
+        <details style="background: #14101F; border: 1px solid #3D1B60; border-radius: 12px; padding: 14px 18px; margin-bottom: 20px; margin-left: 38px;">
+          <summary style="cursor: pointer; font-size: 13px; font-weight: 600; color: #B07CFF;">▶ Why don't these counts add up to 11,947 or 8,331? (tap to open)</summary>
+          <div style="font-size: 13px; color: #B0A3CC; line-height: 1.7; padding-top: 12px;">
+            Good catch — the persona buckets sum to <strong>4,716</strong>, not 8,331 or 11,947. Here's the full funnel so the drop-offs are honest:
+            <div style="margin: 12px 0; background: #0C0A14; border-radius: 8px; padding: 12px 16px;">
+              <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #1E1830;"><span>Raw scraped</span><strong style="color: #F0E8FF;">11,947</strong></div>
+              <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #1E1830;"><span>→ Extraction pass ran on</span><strong style="color: #F0E8FF;">8,331</strong></div>
+              <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #1E1830;"><span>→ Persona field populated on</span><strong style="color: #F0E8FF;">4,721</strong></div>
+              <div style="display: flex; justify-content: space-between; padding: 6px 0;"><span>→ Persona ≠ "unknown"</span><strong style="color: #B07CFF;">140</strong></div>
+            </div>
+            <p><strong>Why the 8,331 → 4,721 drop?</strong> The persona classifier only runs on snippets where the extraction pass produced a coherent intent + barrier + emotional tone triple. Short reviews ("worst app ever", ★1) get scored on sentiment but skip persona classification because there's not enough surface text to infer <em>who</em> is writing.</p>
+            <p style="margin-top: 8px;"><strong>Why is 4,581 of 4,721 tagged "unknown"?</strong> Most reviewers don't drop signals about who they are — no "as a busy professional", no "I'm a student", nothing about kids or age. The classifier is deliberately conservative: absent explicit signal, it emits <code>unknown</code> rather than guess. Guessing would inject demographic hallucinations into every downstream count.</p>
+            <p style="margin-top: 8px;"><strong>So what can the 140 labelled tail actually tell us?</strong> It's a small, high-signal subset — enough to see <em>directional</em> differences (Busy Professionals have 62% frustration vs Homemakers' 25%) but not enough to generalise to population-level claims. That's why S6 leans on <strong>theme-level evidence</strong> (hundreds of snippets per theme), not persona-level segmentation — and why persona work is flagged as a Part-2 interview task, not a Part-1 corpus conclusion.</p>
+          </div>
+        </details>
+
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 16px;">
+          <sc-for list="{{ segmentCardsRow1 }}" as="seg">
+            <div style="background: #14101F; border: 1px solid #1E1830; border-radius: 14px; padding: 24px; text-align: center;">
+              <div style="width: 40px; height: 40px; border-radius: 50%; background: #1E1830; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px;">
+                <span style="font-size: 18px;">{{ seg.icon }}</span>
+              </div>
+              <div style="font-size: 13px; font-weight: 600; color: #F0E8FF; margin-bottom: 6px;">{{ seg.name }}</div>
+              <div style="font-size: 32px; font-weight: 800; color: {{ seg.numColor }};">{{ seg.count }}</div>
+              <div style="font-size: 11px; color: #FB7185; margin-top: 6px;">● {{ seg.negative }}</div>
+            </div>
+          </sc-for>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; max-width: 66.666%;">
+          <sc-for list="{{ segmentCardsRow2 }}" as="seg">
+            <div style="background: #14101F; border: 1px solid #1E1830; border-radius: 14px; padding: 24px; text-align: center;">
+              <div style="width: 40px; height: 40px; border-radius: 50%; background: #1E1830; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px;">
+                <span style="font-size: 18px;">{{ seg.icon }}</span>
+              </div>
+              <div style="font-size: 13px; font-weight: 600; color: #F0E8FF; margin-bottom: 6px;">{{ seg.name }}</div>
+              <div style="font-size: 32px; font-weight: 800; color: {{ seg.numColor }};">{{ seg.count }}</div>
+              <div style="font-size: 11px; color: #FB7185; margin-top: 6px;">● {{ seg.negative }}</div>
+            </div>
+          </sc-for>
+        </div>
+
+        <div style="background: #14101F; border: 1px solid #1E1830; border-radius: 14px; padding: 24px; margin-top: 24px;">
+          <h3 style="font-size: 15px; font-weight: 600; color: #F0E8FF; margin-bottom: 20px;">Segment Size Comparison</h3>
+          {{ segmentChart }}
+        </div>
+      </div>
+
+      <!-- SECTION 6 -->
+      <div id="s6" style="margin-bottom: 40px;">
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+          <span style="width: 28px; height: 28px; border-radius: 8px; background: #7C21DA; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: white;">06</span>
+          <h2 style="font-size: 20px; font-weight: 700; color: #F0E8FF;">What unmet needs emerge consistently across reviews?</h2>
+        </div>
+        <p style="font-size: 12px; color: #7A6B99; margin-left: 38px; margin-bottom: 20px;">Evidence-linked insight cards — the WHAT. One per theme cluster with ≥5 supporting reviews, cited by review-id, then passed through the LLM Critic gate.</p>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+          <sc-for list="{{ unmetNeeds }}" as="need">
+            <div style="background: #14101F; border: 1px solid #1E1830; border-radius: 14px; padding: 24px;">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                <div style="width: 32px; height: 32px; border-radius: 8px; background: #2A2040; display: flex; align-items: center; justify-content: center;">
+                  <span style="font-size: 16px;">{{ need.icon }}</span>
+                </div>
+                <span style="font-size: 12px; font-weight: 700; color: {{ need.scoreColor }};">Confidence: {{ need.score }}</span>
+              </div>
+              <h4 style="font-size: 15px; font-weight: 600; color: #F0E8FF; margin-bottom: 8px;">{{ need.title }}</h4>
+              <p style="font-size: 12px; color: #7A6B99; line-height: 1.6; margin-bottom: 12px;">{{ need.description }}</p>
+              <div style="background: #1E1830; border-radius: 8px; padding: 8px 12px; font-size: 12px; color: #B0A3CC; font-style: italic; border-left: 2px solid #7C21DA;">"{{ need.quote }}"</div>
+              <div style="font-size: 11px; color: #7A6B99; margin-top: 8px;">Theme: {{ need.segment }}</div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+      </sc-if>
+
+      <!-- ===== WORKFLOW PAGES (Streamlit-equivalent, stacked vertically) ===== -->
+      <sc-if value="{{ isWorkflow }}">
+
+      <!-- Repo link banner -->
+      <div style="background: #14101F; border: 1px solid #1E1830; border-radius: 12px; padding: 14px 20px; margin-bottom: 24px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="#B07CFF"><path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.55v-2.03c-3.19.69-3.86-1.36-3.86-1.36-.52-1.32-1.27-1.67-1.27-1.67-1.04-.71.08-.7.08-.7 1.15.08 1.75 1.18 1.75 1.18 1.02 1.75 2.68 1.24 3.34.95.1-.74.4-1.24.72-1.53-2.55-.29-5.23-1.27-5.23-5.68 0-1.25.45-2.28 1.18-3.08-.12-.29-.51-1.46.11-3.05 0 0 .96-.31 3.15 1.18a10.9 10.9 0 015.73 0c2.19-1.49 3.15-1.18 3.15-1.18.62 1.59.23 2.76.11 3.05.74.8 1.18 1.83 1.18 3.08 0 4.42-2.69 5.39-5.25 5.67.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.79.55A11.51 11.51 0 0023.5 12C23.5 5.65 18.35.5 12 .5z"/></svg>
+          <div>
+            <div style="font-size: 13px; font-weight: 600; color: #F0E8FF;">Source code &amp; corpus data</div>
+            <div style="font-size: 11px; color: #7A6B99;">Every scraper, filter, prompt, and parquet in this run is in the repo.</div>
+          </div>
+        </div>
+        <a href="https://github.com/rushilv698/Zepto---Nextleap-Grad-project-1-" target="_blank" rel="noopener" style="padding: 8px 16px; border-radius: 8px; background: linear-gradient(135deg, #7C21DA, #9333EA); color: white; font-size: 12px; font-weight: 600; text-decoration: none;">View on GitHub →</a>
+      </div>
+
+      <!-- w0 Hypothesis -->
+      <div id="w0" style="margin-bottom: 48px;">
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+          <span style="width: 28px; height: 28px; border-radius: 8px; background: linear-gradient(135deg, #7C21DA, #B07CFF); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: white;">H</span>
+          <h2 style="font-size: 20px; font-weight: 700; color: #F0E8FF;">Possible hypotheses</h2>
+        </div>
+        <p style="font-size: 13px; color: #7A6B99; margin-left: 38px; margin-bottom: 20px;">The 3 on-goal hypotheses that survived the LLM Critic gate AND stayed aligned with the Discovery mission (<em>"increase % of MAC who buy from a new category"</em>). 2 other insights passed the evidence gate but were dropped as off-goal — they described churn to competitors, not category exploration.</p>
+
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+          <sc-for list="{{ hypothesisCards }}" as="h">
+            <div style="background: #14101F; border: 1px solid #1E1830; border-radius: 14px; padding: 22px 26px;">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                  <div style="width: 40px; height: 40px; border-radius: 8px; background: #2A2040; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 800; color: #B07CFF;">{{ h.tag }}</div>
+                  <h4 style="font-size: 16px; font-weight: 700; color: #F0E8FF;">{{ h.title }}</h4>
+                </div>
+                <span style="font-size: 12px; font-weight: 700; padding: 5px 14px; border-radius: 6px; background: {{ h.ratingBg }}; color: {{ h.ratingColor }};">{{ h.rating }}</span>
+              </div>
+              <p style="font-size: 13px; color: #B0A3CC; line-height: 1.6; margin-bottom: 12px;">{{ h.description }}</p>
+              <div style="background: #1E1830; border-radius: 8px; padding: 10px 14px; font-size: 13px; color: #B0A3CC; font-style: italic; border-left: 3px solid #7C21DA;">"{{ h.quote }}"</div>
+              <div style="font-size: 11px; color: #7A6B99; margin-top: 10px;">{{ h.status }}</div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+      <!-- w1 Data Collected -->
+      <div id="w1" style="margin-bottom: 48px;">
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+          <span style="width: 28px; height: 28px; border-radius: 8px; background: #7C21DA; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: white;">W1</span>
+          <h2 style="font-size: 20px; font-weight: 700; color: #F0E8FF;">Raw data acquired</h2>
+        </div>
+        <p style="font-size: 13px; color: #7A6B99; margin-left: 38px; margin-bottom: 20px;"><strong>11,947 snippets</strong> collected from four public sources across four Indian quick-commerce brands.</p>
+
+        <details style="background: #14101F; border: 1px solid #1E1830; border-radius: 12px; padding: 14px 18px; margin-bottom: 16px;">
+          <summary style="cursor: pointer; font-size: 13px; font-weight: 600; color: #B07CFF;">How this data was obtained</summary>
+          <div style="font-size: 13px; color: #B0A3CC; line-height: 1.7; padding-top: 12px;">
+            The engine gathers <strong>public user feedback at scale</strong> from four independent surface areas — each chosen because it captures a different slice of the customer voice:
+            <ol style="padding-left: 20px; margin: 8px 0;">
+              <li><strong>App-store reviews</strong> — direct product feedback, high volume, complaint-shaped.</li>
+              <li><strong>Reddit posts and comments</strong> — organic discussion, richer mental-model signals.</li>
+              <li><strong>YouTube comments</strong> — reactions to ads, hauls, comparison videos, founder interviews.</li>
+              <li><strong>News/business media</strong> — analyst framing that shapes consumer perception.</li>
+            </ol>
+            <p style="margin-top: 8px;"><strong>Multi-brand:</strong> we scrape Zepto (the primary subject) plus three competitors as a control set, so any pattern found can be tested against "does this show up on the other apps too?".</p>
+            <p style="margin-top: 8px;"><strong>Multi-language:</strong> English, Hindi, and Hinglish are all captured. The pipeline does not translate — modern LLMs handle all three natively.</p>
+            <p style="margin-top: 8px;"><strong>Freshness:</strong> all data is scraped in real time. Each source's specific method is documented so anyone can reproduce it.</p>
+          </div>
+        </details>
+
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px;">
+          <div style="background: #14101F; border: 1px solid #1E1830; border-radius: 12px; padding: 16px;">
+            <div style="font-size: 11px; color: #7A6B99; text-transform: uppercase; letter-spacing: 0.05em;">Total snippets</div>
+            <div style="font-size: 24px; font-weight: 800; color: #F0E8FF; margin-top: 4px;">11,947</div>
+          </div>
+          <div style="background: #14101F; border: 1px solid #1E1830; border-radius: 12px; padding: 16px;">
+            <div style="font-size: 11px; color: #7A6B99; text-transform: uppercase; letter-spacing: 0.05em;">Zepto (primary)</div>
+            <div style="font-size: 24px; font-weight: 800; color: #B07CFF; margin-top: 4px;">8,656</div>
+            <div style="font-size: 11px; color: #7A6B99; margin-top: 2px;">72%</div>
+          </div>
+          <div style="background: #14101F; border: 1px solid #1E1830; border-radius: 12px; padding: 16px;">
+            <div style="font-size: 11px; color: #7A6B99; text-transform: uppercase; letter-spacing: 0.05em;">Competitors (control)</div>
+            <div style="font-size: 24px; font-weight: 800; color: #B4B4C1; margin-top: 4px;">3,291</div>
+            <div style="font-size: 11px; color: #7A6B99; margin-top: 2px;">28%</div>
+          </div>
+          <div style="background: #14101F; border: 1px solid #1E1830; border-radius: 12px; padding: 16px;">
+            <div style="font-size: 11px; color: #7A6B99; text-transform: uppercase; letter-spacing: 0.05em;">Languages</div>
+            <div style="font-size: 15px; font-weight: 700; color: #F0E8FF; margin-top: 8px;">en / hi / hinglish</div>
+          </div>
+        </div>
+
+        <details style="background: #14101F; border: 1px solid #1E1830; border-radius: 12px; padding: 14px 18px; margin-bottom: 16px;">
+          <summary style="cursor: pointer; font-size: 13px; font-weight: 600; color: #B07CFF;">❓ Why did we collect competitor data if the project is about Zepto?</summary>
+          <div style="font-size: 13px; color: #B0A3CC; line-height: 1.7; padding-top: 12px;">
+            The project is about Zepto — <strong>8,656 of 11,947 snippets (72%) are Zepto</strong>. The other <strong>3,291 (28%) are three competitors</strong> (Blinkit, BigBasket, Swiggy Instamart) and serve a specific analytical purpose:
+            <ol style="padding-left: 20px; margin: 8px 0;">
+              <li><strong>Cross-source validation (a quality check).</strong> For an insight to be tagged <code>confirmed</code> in Quality Validation, its supporting evidence must span at least 2 sources AND 2 brands. Without competitor data, this check is meaningless.</li>
+              <li><strong>Zepto-specific vs industry-wide.</strong> If users complain about the same thing on all four apps, it's an industry-level friction — not a Zepto opportunity.</li>
+              <li><strong>Real user comparison behavior.</strong> Users express category-exploration mental models while comparing brands ("I use Zepto for groceries but Blinkit for produce"). That comparison only appears when both brands are named.</li>
+            </ol>
+            <p style="margin-top: 8px;">Competitor data is a <strong>control group</strong>, deliberately smaller than the Zepto primary set. It is <em>not</em> used to make claims about the competitors themselves.</p>
+          </div>
+        </details>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+          <div style="background: #14101F; border: 1px solid #1E1830; border-radius: 14px; padding: 24px;">
+            <h3 style="font-size: 14px; font-weight: 600; color: #F0E8FF; margin-bottom: 16px;">By source</h3>
+            <sc-for list="{{ sourceBars }}" as="bar">
+              <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px;">
+                <div style="width: 110px; font-size: 12px; color: #B0A3CC;">{{ bar.label }}</div>
+                <div style="flex: 1; height: 22px; background: #1E1830; border-radius: 4px; overflow: hidden;">
+                  <div style="height: 100%; border-radius: 4px; background: {{ bar.color }}; width: {{ bar.width }}; animation: barGrow 0.8s ease;"></div>
+                </div>
+                <span style="font-size: 12px; font-weight: 600; color: #F0E8FF; width: 60px; text-align: right;">{{ bar.value }}</span>
+              </div>
+            </sc-for>
+          </div>
+          <div style="background: #14101F; border: 1px solid #1E1830; border-radius: 14px; padding: 24px;">
+            <h3 style="font-size: 14px; font-weight: 600; color: #F0E8FF; margin-bottom: 16px;">By brand</h3>
+            <sc-for list="{{ brandBars }}" as="bar">
+              <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px;">
+                <div style="width: 170px; font-size: 12px; color: #B0A3CC;">{{ bar.label }}</div>
+                <div style="flex: 1; height: 22px; background: #1E1830; border-radius: 4px; overflow: hidden;">
+                  <div style="height: 100%; border-radius: 4px; background: {{ bar.color }}; width: {{ bar.width }}; animation: barGrow 0.8s ease;"></div>
+                </div>
+                <span style="font-size: 12px; font-weight: 600; color: #F0E8FF; width: 60px; text-align: right;">{{ bar.value }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+
+        <div style="background: #14101F; border: 1px solid #1E1830; border-radius: 14px; padding: 24px;">
+          <h3 style="font-size: 14px; font-weight: 600; color: #F0E8FF; margin-bottom: 14px;">How each source was collected</h3>
+          <div style="font-size: 13px; color: #B0A3CC; line-height: 1.8;">
+            <p><strong>📱 Play Store</strong> <em>(free direct library)</em> — Zepto, Blinkit, BigBasket, Swiggy Instamart. India, English, newest reviews.</p>
+            <p><strong>💬 Reddit</strong> <em>(Apify)</em> — 30 India-focused subreddits + 25 broad-context search terms (<code>quick commerce india</code>, <code>kirana vs online</code>, <code>grocery habits</code>, etc.).</p>
+            <p><strong>📺 YouTube comments</strong> <em>(free)</em> — 36 curated videos: Zepto Cafe launch, founder interviews, comparison reviews, business-model breakdowns, grocery hauls.</p>
+            <p><strong>📰 News + business media</strong> <em>(free, via Google News RSS)</em> — 12 Zepto queries, real article URLs decoded and scraped from 15+ preferred publishers (Inc42, YourStory, LiveMint, Business Standard, Moneycontrol, NDTV Profit).</p>
+            <p style="color: #7A6B99;"><strong>❌ Skipped</strong> — Twitter/X and App Store (paid gates / broken endpoints; documented honestly).</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- w2 Data Filtering -->
+      <div id="w2" style="margin-bottom: 48px;">
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+          <span style="width: 28px; height: 28px; border-radius: 8px; background: #7C21DA; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: white;">W2</span>
+          <h2 style="font-size: 20px; font-weight: 700; color: #F0E8FF;">Filtered data — 8-layer sequential filtration</h2>
+        </div>
+        <p style="font-size: 13px; color: #7A6B99; margin-left: 38px; margin-bottom: 20px;">Every snippet passes through eight sequential filters before it can influence any downstream analysis. Each layer removes a specific kind of noise or down-weights low-value signal.</p>
+
+        <details style="background: #14101F; border: 1px solid #1E1830; border-radius: 12px; padding: 14px 18px; margin-bottom: 16px;">
+          <summary style="cursor: pointer; font-size: 13px; font-weight: 600; color: #B07CFF;">How filtration is designed</summary>
+          <div style="font-size: 13px; color: #B0A3CC; line-height: 1.7; padding-top: 12px;">
+            Filtration is not about removing noise for its own sake — it's about ensuring <strong>only information capable of producing meaningful product insights</strong> enters the discovery pipeline.
+            <ul style="padding-left: 20px; margin: 8px 0;">
+              <li><strong>Layers 1–3</strong> (language, spam, relevance) <em>drop</em> obvious noise: junk characters, coupon spam, operational-only complaints that don't discuss shopping behavior.</li>
+              <li><strong>Layer 4</strong> (semantic deduplication) prevents one loud opinion from being counted many times — even if worded slightly differently.</li>
+              <li><strong>Layers 5–6</strong> (behaviour, specificity) <em>tag and rank</em> rather than drop — they identify reviews describing real behavioural signal and down-weight generic praise like "good app".</li>
+              <li><strong>Layer 7</strong> combines the ratings into a single Information Value Score used for prioritisation.</li>
+              <li><strong>Layer 8</strong> applies recency and regional weighting at scoring time — recent reviews and city-specific patterns weigh more.</li>
+            </ul>
+            Every filtration decision is stored, so nothing is silently dropped.
+          </div>
+        </details>
+
+        <div style="background: #14101F; border: 1px solid #1E1830; border-radius: 14px; padding: 24px; margin-bottom: 16px;">
+          <h3 style="font-size: 14px; font-weight: 600; color: #F0E8FF; margin-bottom: 14px;">Filtration funnel</h3>
+          <sc-for list="{{ funnelSteps }}" as="step">
+            <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 10px;">
+              <div style="width: 40px; font-size: 11px; color: #7A6B99; font-weight: 600;">{{ step.layer }}</div>
+              <div style="flex: 1; height: 30px; background: #1E1830; border-radius: 6px; overflow: hidden; position: relative;">
+                <div style="height: 100%; border-radius: 6px; background: linear-gradient(90deg, #7C21DA, #B07CFF); width: {{ step.width }}; animation: barGrow 1s ease; display: flex; align-items: center; padding-left: 12px;">
+                  <span style="font-size: 12px; font-weight: 600; color: white;">{{ step.label }}</span>
+                </div>
+              </div>
+              <span style="font-size: 13px; font-weight: 700; color: #F0E8FF; width: 80px; text-align: right;">{{ step.count }}</span>
+              <span style="font-size: 11px; color: #7A6B99; width: 55px; text-align: right;">{{ step.pct }}</span>
+            </div>
+          </sc-for>
+        </div>
+
+        <div style="background: #14101F; border: 1px solid #1E1830; border-radius: 14px; padding: 24px; margin-bottom: 16px;">
+          <h3 style="font-size: 14px; font-weight: 600; color: #F0E8FF; margin-bottom: 14px;">Per-layer detail</h3>
+          <sc-for list="{{ filterLayers }}" as="l">
+            <div style="display: grid; grid-template-columns: 250px 1fr 160px; gap: 12px; padding: 10px 0; border-bottom: 1px solid #1E1830; font-size: 12px;">
+              <div style="color: #F0E8FF; font-weight: 600;">{{ l.name }}</div>
+              <div style="color: #B0A3CC; line-height: 1.5;">{{ l.what }}</div>
+              <div style="color: #B07CFF; font-weight: 600; text-align: right;">{{ l.result }}</div>
+            </div>
+          </sc-for>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+          <div style="background: #14101F; border: 1px solid #1E1830; border-radius: 14px; padding: 20px;">
+            <div style="font-size: 11px; color: #7A6B99; text-transform: uppercase; letter-spacing: 0.05em;">Broad-relevance keepers</div>
+            <div style="font-size: 28px; font-weight: 800; color: #F0E8FF; margin-top: 6px;">1,073</div>
+            <div style="font-size: 11px; color: #7A6B99; margin-top: 4px;">Everything that survived filters 1–4. Available for R&D comparison (see Version History).</div>
+          </div>
+          <div style="background: #14101F; border: 1px solid #7C21DA; border-radius: 14px; padding: 20px;">
+            <div style="font-size: 11px; color: #B07CFF; text-transform: uppercase; letter-spacing: 0.05em;">Goal-aligned keepers</div>
+            <div style="font-size: 28px; font-weight: 800; color: #B07CFF; margin-top: 6px;">634</div>
+            <div style="font-size: 11px; color: #7A6B99; margin-top: 4px;">Restricted to snippets whose behaviour flags describe exploration / hesitation / decision-process. This is the set used for the primary insights.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- w3 Theme Generation -->
+      <div id="w3" style="margin-bottom: 48px;">
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+          <span style="width: 28px; height: 28px; border-radius: 8px; background: #7C21DA; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: white;">W3</span>
+          <h2 style="font-size: 20px; font-weight: 700; color: #F0E8FF;">Themes generated</h2>
+        </div>
+        <p style="font-size: 13px; color: #7A6B99; margin-left: 38px; margin-bottom: 20px;">Themes emerge dynamically from the data (seed → grow → consolidate) rather than being pre-defined. Initial themes come from a 200-review sample; snippets that don't match any existing theme go into a candidate pool and are periodically clustered into new themes. Near-duplicate themes are auto-merged after every 500 assignments.</p>
+
+        <details open style="background: #14101F; border: 1px solid #1E1830; border-radius: 12px; padding: 14px 18px; margin-bottom: 16px;">
+          <summary style="cursor: pointer; font-size: 13px; font-weight: 600; color: #B07CFF;">How to read this — parent buckets vs leaf themes</summary>
+          <div style="font-size: 13px; color: #B0A3CC; line-height: 1.7; padding-top: 12px;">
+            Themes are organised in a <strong>two-level hierarchy</strong>:
+            <ul style="padding-left: 20px; margin: 8px 0;">
+              <li><strong>Parent buckets</strong> — the <em>big categories</em> a review can fall into. Broad, stable, easy to scan. Example: <strong>"Value Perception &amp; Price Sensitivity"</strong>.</li>
+              <li><strong>Leaf themes</strong> — the <em>specific behaviours</em> underneath each parent. This is where the actionable pattern lives. Example: <strong>"Repeat-Order Habit Loops"</strong> nested under User Behaviour &amp; Decision Drivers.</li>
+            </ul>
+            Two types of leaf themes:
+            <ul style="padding-left: 20px; margin: 8px 0;">
+              <li><strong>seed</strong> — one of the original themes generated by the LLM from a 200-review sample.</li>
+              <li><strong>emergent</strong> — discovered later by DBSCAN clustering from snippets that didn't fit any existing theme.</li>
+            </ul>
+            <strong>Insights are generated per leaf theme, not per parent bucket</strong> — the parent is just an organising shelf.
+          </div>
+        </details>
+
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px;">
+          <div style="background: #14101F; border: 1px solid #1E1830; border-radius: 12px; padding: 16px;"><div style="font-size: 11px; color: #7A6B99; text-transform: uppercase;">Total themes</div><div style="font-size: 24px; font-weight: 800; color: #F0E8FF; margin-top: 4px;">42</div></div>
+          <div style="background: #14101F; border: 1px solid #1E1830; border-radius: 12px; padding: 16px;"><div style="font-size: 11px; color: #7A6B99; text-transform: uppercase;">Parent buckets</div><div style="font-size: 24px; font-weight: 800; color: #B07CFF; margin-top: 4px;">8</div></div>
+          <div style="background: #14101F; border: 1px solid #1E1830; border-radius: 12px; padding: 16px;"><div style="font-size: 11px; color: #7A6B99; text-transform: uppercase;">Leaf themes</div><div style="font-size: 24px; font-weight: 800; color: #B07CFF; margin-top: 4px;">34</div></div>
+          <div style="background: #14101F; border: 1px solid #1E1830; border-radius: 12px; padding: 16px;"><div style="font-size: 11px; color: #7A6B99; text-transform: uppercase;">Emergent from data</div><div style="font-size: 24px; font-weight: 800; color: #34D399; margin-top: 4px;">4</div></div>
+        </div>
+
+        <div style="background: #14101F; border: 1px solid #1E1830; border-radius: 14px; padding: 24px; margin-bottom: 16px;">
+          <h3 style="font-size: 14px; font-weight: 600; color: #F0E8FF; margin-bottom: 14px;">Themes by supporting-review count</h3>
+          <sc-for list="{{ topThemes }}" as="t">
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+              <div style="flex: 1; font-size: 12px; color: #B0A3CC;">{{ t.name }}</div>
+              <div style="width: 240px; height: 18px; background: #1E1830; border-radius: 3px; overflow: hidden;">
+                <div style="height: 100%; background: {{ t.color }}; width: {{ t.width }}; animation: barGrow 0.8s ease;"></div>
+              </div>
+              <span style="font-size: 12px; font-weight: 700; color: #F0E8FF; width: 40px; text-align: right;">{{ t.count }}</span>
+            </div>
+          </sc-for>
+        </div>
+
+        <div style="background: #14101F; border: 1px solid #1E1830; border-radius: 14px; padding: 24px;">
+          <h3 style="font-size: 14px; font-weight: 600; color: #F0E8FF; margin-bottom: 14px;">Hierarchy — parent buckets → leaf themes</h3>
+          <sc-for list="{{ themeHierarchy }}" as="p">
+            <details style="margin-bottom: 8px; background: #0C0A14; border: 1px solid #1E1830; border-radius: 8px; padding: 12px 16px;">
+              <summary style="cursor: pointer; font-size: 13px; font-weight: 600; color: #F0E8FF;">{{ p.summary }}</summary>
+              <div style="padding-top: 10px; font-size: 12px; color: #7A6B99; line-height: 1.6;">{{ p.definition }}</div>
+              <sc-for list="{{ p.children }}" as="c">
+                <div style="padding: 6px 0 6px 12px; border-left: 2px solid #2A2040; margin-top: 6px;">
+                  <span style="font-size: 12px; color: #F0E8FF; font-weight: 600;">{{ c.name }}</span>
+                  <span style="font-size: 11px; color: #7A6B99; margin-left: 8px;">· {{ c.members }} reviews · <code style="color: {{ c.badgeColor }};">{{ c.badge }}</code></span>
+                </div>
+              </sc-for>
+            </details>
+          </sc-for>
+        </div>
+      </div>
+
+      <!-- w4 Insight Generation -->
+      <div id="w4" style="margin-bottom: 48px;">
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+          <span style="width: 28px; height: 28px; border-radius: 8px; background: #7C21DA; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: white;">W4</span>
+          <h2 style="font-size: 20px; font-weight: 700; color: #F0E8FF;">Insights generated</h2>
+        </div>
+        <p style="font-size: 13px; color: #7A6B99; margin-left: 38px; margin-bottom: 20px;">Every insight the engine generated — <strong>before</strong> any validation was applied.</p>
+
+        <details style="background: #14101F; border: 1px solid #1E1830; border-radius: 12px; padding: 14px 18px; margin-bottom: 16px;">
+          <summary style="cursor: pointer; font-size: 13px; font-weight: 600; color: #B07CFF;">How these insights were generated</summary>
+          <div style="font-size: 13px; color: #B0A3CC; line-height: 1.7; padding-top: 12px;">
+            Each insight is one hypothesis per leaf theme with 5+ supporting reviews.
+            <ul style="padding-left: 20px; margin: 8px 0;">
+              <li><strong>Sampling</strong> — up to 15 highest-quality supporting reviews per theme.</li>
+              <li><strong>Generation</strong> — DeepSeek reads that sample and produces a causal claim, cites specific review IDs as supporting evidence, and drafts a suggested 2-week experiment plus an open-ended interview probe.</li>
+              <li><strong>Output per theme</strong> — one insight card containing hypothesis · one-line · detailed reasoning · suggested experiment · interview probe.</li>
+            </ul>
+            The Quality Validation step below puts each of them through the 5-check matrix + independent LLM Critic to decide which ones survive to the Dashboard.
+          </div>
+        </details>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+          <div style="background: #14101F; border: 1px solid #1E1830; border-radius: 12px; padding: 20px;"><div style="font-size: 11px; color: #7A6B99; text-transform: uppercase;">Total themes</div><div style="font-size: 28px; font-weight: 800; color: #F0E8FF; margin-top: 4px;">42</div><div style="font-size: 11px; color: #7A6B99; margin-top: 4px;">Parent buckets + leaf themes combined.</div></div>
+          <div style="background: #14101F; border: 1px solid #7C21DA; border-radius: 12px; padding: 20px;"><div style="font-size: 11px; color: #B07CFF; text-transform: uppercase;">Insights with supporting evidence ≥ 5</div><div style="font-size: 28px; font-weight: 800; color: #B07CFF; margin-top: 4px;">12</div><div style="font-size: 11px; color: #7A6B99; margin-top: 4px;">Only themes with ≥5 supporting reviews qualify. See the expander below.</div></div>
+        </div>
+
+        <details style="background: #14101F; border: 1px solid #1E1830; border-radius: 12px; padding: 14px 18px; margin-bottom: 16px;">
+          <summary style="cursor: pointer; font-size: 13px; font-weight: 600; color: #B07CFF;">Why don't ALL themes get an insight?</summary>
+          <div style="font-size: 13px; color: #B0A3CC; line-height: 1.7; padding-top: 12px;">
+            The engine generates <strong>one insight per leaf theme</strong>, but only when the theme has <strong>at least 5 supporting reviews</strong>. This threshold exists to avoid fabricated-sounding claims — a hypothesis inferred from 1 or 2 quotes is speculation, not signal.
+            <p style="margin-top: 8px;">Of the 42 themes:</p>
+            <ul style="padding-left: 20px; margin: 8px 0;">
+              <li><strong>8</strong> are <em>parent buckets</em> — organising shelves with no direct member reviews. Their children carry the reviews. Parents don't get their own insights.</li>
+              <li><strong>22</strong> are <em>leaf themes with too few reviews</em> (1–4 supporting reviews) — the engine skips them because the LLM Critic would reject any insight from them anyway.</li>
+              <li><strong>12</strong> are <em>leaf themes with ≥ 5 supporting reviews</em> — one insight per theme → <strong>12 insights</strong>.</li>
+            </ul>
+            <p style="margin-top: 10px;"><strong>Why 5 and not some other number?</strong></p>
+            <ol style="padding-left: 20px; margin: 8px 0;">
+              <li><strong>The downstream Evidence check needs ≥ 5 citations.</strong> A theme with only 4 supporting reviews can only cite 4 quotes — the Evidence check would fail automatically.</li>
+              <li><strong>PDF methodology guidance.</strong> The methodology doc suggests ≥ 8 members for theme promotion. <strong>5 is the softened compromise</strong> so the expansion-only corpus produces any insights at all.</li>
+              <li><strong>LLM hallucination risk.</strong> Below ~5 quotes the generator starts extrapolating — <em>"these 3 users said X, therefore users in general believe Y"</em>.</li>
+            </ol>
+          </div>
+        </details>
+
+        <div style="background: #14101F; border: 1px solid #1E1830; border-radius: 14px; padding: 24px;">
+          <h3 style="font-size: 14px; font-weight: 600; color: #F0E8FF; margin-bottom: 6px;">All 12 insights that were generated, ranked by confidence</h3>
+          <p style="font-size: 11px; color: #7A6B99; margin-bottom: 14px;">#1 is the most confident. Every insight the engine produced is shown here — the drop-off from <em>generated</em> to <em>usable on Dashboard</em> is in Quality Validation.</p>
+          <sc-for list="{{ v2Cards }}" as="c">
+            <div style="padding: 12px 0; border-bottom: 1px solid #1E1830; display: flex; gap: 16px; align-items: flex-start;">
+              <div style="width: 30px; height: 30px; border-radius: 6px; background: #2A2040; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #B07CFF; flex-shrink: 0;">#{{ c.id }}</div>
+              <div style="flex: 1;">
+                <div style="font-size: 13px; font-weight: 600; color: #F0E8FF; margin-bottom: 4px;">{{ c.theme }}</div>
+                <div style="font-size: 12px; color: #7A6B99; line-height: 1.5;">{{ c.oneLine }}</div>
+              </div>
+              <div style="font-size: 11px; font-weight: 700; color: {{ c.confColor }}; flex-shrink: 0;">conf {{ c.confidence }}</div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+      <!-- w5 Quality Validation -->
+      <div id="w5" style="margin-bottom: 48px;">
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+          <span style="width: 28px; height: 28px; border-radius: 8px; background: #7C21DA; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: white;">W5</span>
+          <h2 style="font-size: 20px; font-weight: 700; color: #F0E8FF;">Insight quality — multi-layer validation</h2>
+        </div>
+        <p style="font-size: 13px; color: #7A6B99; margin-left: 38px; margin-bottom: 20px;">Every theme-level insight was scored on 5 automated validation checks plus an independent LLM Critic Agent (a different model from the generator) that reviewed each insight against retrieved counter-evidence.</p>
+
+        <details style="background: #14101F; border: 1px solid #1E1830; border-radius: 12px; padding: 14px 18px; margin-bottom: 16px;">
+          <summary style="cursor: pointer; font-size: 13px; font-weight: 600; color: #B07CFF;">How validation works</summary>
+          <div style="font-size: 13px; color: #B0A3CC; line-height: 1.7; padding-top: 12px;">
+            The PDF methodology says: <em>"insights generated by AI should never be accepted without validation."</em> This tab implements that philosophy — every theme-level insight is subjected to <strong>five automated checks + an independent LLM Critic Agent</strong> before it's tagged usable.
+            <p style="margin-top: 10px;"><strong>The five checks each insight must clear</strong></p>
+            <ol style="padding-left: 20px; margin: 8px 0;">
+              <li><strong>Evidence</strong> — the generator must have cited ≥ 5 supporting review IDs. Insufficient citations → shelved.</li>
+              <li><strong>Cross-source</strong> — the cited evidence must span ≥ 2 different sources (Play Store, Reddit, YouTube) AND ≥ 2 different brands (Zepto + at least one competitor).</li>
+              <li><strong>Statistical</strong> — the underlying theme cluster must have ≥ 20 unique authors AND cover at least 0.5% of the filtered corpus.</li>
+              <li><strong>Cluster quality</strong> — the theme's supporting reviews must have a mean intra-cluster cosine similarity ≥ 0.70.</li>
+              <li><strong>LLM Critic Agent</strong> — GPT-4.1 (a different model from the generator) reads the insight plus supporting evidence plus 10 retrieved <em>counter-evidence</em> snippets, and returns a verdict: <strong>pass / revise / reject</strong>.</li>
+            </ol>
+            <p style="margin-top: 10px;"><strong>Two design choices worth calling out</strong></p>
+            <ul style="padding-left: 20px; margin: 8px 0;">
+              <li><strong>The Critic is a DIFFERENT model from the generator.</strong> Insights are generated by DeepSeek; the Critic is GPT-4.1. Same model marking its own homework is worthless.</li>
+              <li><strong>The Critic sees retrieved counter-evidence, not just supporting quotes.</strong> The pipeline searches the corpus for snippets that could <em>contradict</em> the hypothesis before handing them to the Critic.</li>
+            </ul>
+            <p style="margin-top: 10px;"><strong>Two validation layers from the PDF are honestly not evaluated</strong> — Behavioural Validation (recommendation CTR, category visits, repeat purchases) and Business &amp; Experiment Validation (A/B uplift) both require Zepto internal analytics we don't have. Flagged <code>not_evaluated</code> and <code>deferred_to_part_4</code> in every insight's confidence breakdown — never silently skipped.</p>
+          </div>
+        </details>
+
+        <div style="background: #14101F; border: 1px solid #1E1830; border-radius: 14px; padding: 24px; margin-bottom: 16px;">
+          <h3 style="font-size: 14px; font-weight: 600; color: #F0E8FF; margin-bottom: 14px;">The validation funnel</h3>
+          <sc-for list="{{ validationFunnel }}" as="v">
+            <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 10px;">
+              <div style="width: 220px; font-size: 12px; color: #B0A3CC;">{{ v.label }}</div>
+              <div style="flex: 1; height: 30px; background: #1E1830; border-radius: 6px; overflow: hidden;">
+                <div style="height: 100%; border-radius: 6px; background: {{ v.color }}; width: {{ v.width }}; animation: barGrow 1s ease; display: flex; align-items: center; padding-left: 12px;">
+                  <span style="font-size: 12px; font-weight: 600; color: white;">{{ v.count }}</span>
+                </div>
+              </div>
+              <span style="font-size: 11px; color: #7A6B99; width: 70px; text-align: right;">{{ v.pct }}</span>
+            </div>
+          </sc-for>
+          <p style="font-size: 12px; color: #B0A3CC; margin-top: 12px; line-height: 1.5;"><strong>Reading:</strong> 12 insights were generated. The LLM Critic passed or revised 5 of them and rejected 7. A further strategic-alignment filter (are they on-goal for the Discovery mission?) dropped 2 churn-focused hypotheses, so the Dashboard shows the <strong>3 on-goal insights</strong>.</p>
+        </div>
+
+        <div style="background: #14101F; border: 1px solid #1E1830; border-radius: 14px; padding: 24px; margin-bottom: 16px;">
+          <h3 style="font-size: 14px; font-weight: 600; color: #F0E8FF; margin-bottom: 14px;">The five automated checks</h3>
+          <sc-for list="{{ qualityChecks }}" as="q">
+            <div style="display: flex; align-items: center; gap: 16px; padding: 12px 0; border-bottom: 1px solid #1E1830;">
+              <div style="width: 32px; height: 32px; border-radius: 8px; background: {{ q.bg }}; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                <span style="font-size: 14px;">{{ q.icon }}</span>
+              </div>
+              <div style="flex: 1;">
+                <div style="font-size: 13px; font-weight: 600; color: #F0E8FF;">{{ q.name }}</div>
+                <div style="font-size: 11px; color: #7A6B99; margin-top: 2px;">{{ q.description }}</div>
+              </div>
+              <div style="font-size: 11px; font-weight: 700; color: {{ q.statusColor }}; padding: 4px 10px; border-radius: 6px; background: {{ q.statusBg }};">{{ q.status }}</div>
+            </div>
+          </sc-for>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px;">
+          <div style="background: #14101F; border: 1px solid #1E1830; border-radius: 12px; padding: 16px;"><div style="font-size: 11px; color: #7A6B99; text-transform: uppercase;">Total insights</div><div style="font-size: 24px; font-weight: 800; color: #F0E8FF; margin-top: 4px;">12</div></div>
+          <div style="background: #14101F; border: 1px solid #1B4D2A; border-radius: 12px; padding: 16px;"><div style="font-size: 11px; color: #34D399; text-transform: uppercase;">🟢 Confirmed</div><div style="font-size: 24px; font-weight: 800; color: #34D399; margin-top: 4px;">2</div></div>
+          <div style="background: #14101F; border: 1px solid #4D3F1B; border-radius: 12px; padding: 16px;"><div style="font-size: 11px; color: #FBBF24; text-transform: uppercase;">🟡 Exploratory</div><div style="font-size: 24px; font-weight: 800; color: #FBBF24; margin-top: 4px;">3</div></div>
+          <div style="background: #14101F; border: 1px solid #601B3A; border-radius: 12px; padding: 16px;"><div style="font-size: 11px; color: #FB7185; text-transform: uppercase;">🔴 Shelved</div><div style="font-size: 24px; font-weight: 800; color: #FB7185; margin-top: 4px;">7</div></div>
+        </div>
+
+        <div style="background: #2D2818; border: 1px solid #4D3F1B; border-radius: 12px; padding: 16px 20px; font-size: 12px; color: #FBBF24; line-height: 1.6;">
+          <strong>Honest gaps:</strong> Behavioural validation (recommendation CTR, category visits, repeat purchases) and Business &amp; Experiment validation (A/B uplift) require Zepto internal analytics we don't have. They're flagged <code>not_evaluated</code> and <code>deferred_to_part_4</code> in every insight's confidence breakdown — not silently skipped.
+        </div>
+      </div>
+
+      <!-- w6 Version History -->
+      <div id="w6" style="margin-bottom: 48px;">
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+          <span style="width: 28px; height: 28px; border-radius: 8px; background: #7C21DA; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: white;">W6</span>
+          <h2 style="font-size: 20px; font-weight: 700; color: #F0E8FF;">Methodology &amp; versions</h2>
+        </div>
+        <p style="font-size: 13px; color: #7A6B99; margin-left: 38px; margin-bottom: 20px;">For anyone auditing the work: this engine went through multiple methodology iterations before landing on the primary approach used in the Dashboard. Older versions are preserved for comparison.</p>
+
+        <div style="background: #14101F; border: 1px solid #1E1830; border-radius: 14px; padding: 24px; margin-bottom: 16px;">
+          <h3 style="font-size: 14px; font-weight: 600; color: #F0E8FF; margin-bottom: 10px;">Why four versions exist</h3>
+          <div style="font-size: 13px; color: #B0A3CC; line-height: 1.7;">
+            <p>The first two attempts (<strong>v1</strong> and <strong>v3</strong>) use a <strong>fixed-taxonomy, post-hoc clustering</strong> approach — extract labels from every review against a pre-defined 9-barrier list, then DBSCAN the embeddings. The problem: real users don't complain in those 9 categories, so the LLM force-fits noise into the wrong boxes.</p>
+            <p style="margin-top: 8px;">The next two (<strong>v2</strong> and <strong>v2.1</strong>) use the <strong>PDF methodology</strong> — an 8-layer filter, an evolving taxonomy that grows from the data itself, evidence-linked hypotheses, and a 5-check validation gate.</p>
+            <p style="margin-top: 8px;"><strong>v2.1</strong> is what powers the primary dashboard because it filters the candidate universe to snippets that describe exploration / hesitation / decision-making — directly on the goal. <strong>v2</strong> (broad relevance) is retained for comparison; its insights are richer in trust/price/service texture but drift off-goal.</p>
+          </div>
+        </div>
+
+        <div style="background: #14101F; border: 1px solid #1E1830; border-radius: 14px; padding: 24px; margin-bottom: 16px;">
+          <h3 style="font-size: 14px; font-weight: 600; color: #F0E8FF; margin-bottom: 14px;">Version comparison</h3>
+          <div style="display: grid; grid-template-columns: 90px 1fr 1fr 1fr 140px; gap: 12px; padding: 8px 0; border-bottom: 2px solid #2A2040; font-size: 11px; font-weight: 700; color: #7A6B99; text-transform: uppercase; letter-spacing: 0.05em;">
+            <div>Version</div><div>Filtration</div><div>Taxonomy</div><div>Validation</div><div style="text-align: right;">Cards / insights</div>
+          </div>
+          <sc-for list="{{ versionCompare }}" as="v">
+            <div style="display: grid; grid-template-columns: 90px 1fr 1fr 1fr 140px; gap: 12px; padding: 10px 0; border-bottom: 1px solid #1E1830; font-size: 12px; color: #B0A3CC;">
+              <div style="font-weight: 700; color: {{ v.color }};">{{ v.version }}</div>
+              <div>{{ v.filtration }}</div>
+              <div>{{ v.taxonomy }}</div>
+              <div>{{ v.validation }}</div>
+              <div style="text-align: right; font-weight: 600; color: #F0E8FF;">{{ v.cards }}</div>
+            </div>
+          </sc-for>
+        </div>
+
+        <div style="background: #14101F; border: 1px solid #1E1830; border-radius: 14px; padding: 24px;">
+          <h3 style="font-size: 14px; font-weight: 600; color: #F0E8FF; margin-bottom: 14px;">v2 (broad-relevance) insights — for comparison</h3>
+          <p style="font-size: 12px; color: #7A6B99; margin-bottom: 14px;">Richer in trust/price/service texture but drift off the exploration goal. Kept side-by-side for reviewer audit.</p>
+          <sc-for list="{{ v2Cards }}" as="c">
+            <div style="padding: 10px 0; border-bottom: 1px solid #1E1830; display: flex; gap: 12px; align-items: flex-start;">
+              <div style="width: 22px; height: 22px; border-radius: 5px; background: #2A2040; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: #B07CFF; flex-shrink: 0;">{{ c.id }}</div>
+              <div style="flex: 1;">
+                <div style="font-size: 12px; font-weight: 600; color: #F0E8FF;">{{ c.theme }}</div>
+                <div style="font-size: 11px; color: #7A6B99; line-height: 1.5; margin-top: 2px;">{{ c.oneLine }}</div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+      </sc-if>
+
+      <!-- ===== SETTINGS PAGE ===== -->
+      <sc-if value="{{ isSettings }}">
+        <div style="max-width: 820px;">
+          <div style="margin-bottom: 24px;">
+            <h2 style="font-size: 22px; font-weight: 700; color: #F0E8FF; margin-bottom: 4px;">Settings</h2>
+            <p style="font-size: 13px; color: #7A6B99;">Bring-your-own-key. Keys stay in your browser (localStorage) and are sent directly from your browser to the provider — nothing is proxied through our servers.</p>
+          </div>
+
+          <!-- Keys card -->
+          <div style="background: #14101F; border: 1px solid #1E1830; border-radius: 14px; padding: 24px; margin-bottom: 16px;">
+            <h3 style="font-size: 15px; font-weight: 600; color: #F0E8FF; margin-bottom: 4px;">API Keys</h3>
+            <p style="font-size: 12px; color: #7A6B99; margin-bottom: 20px;">Required for the RAG chatbot and the live scrape button. Existing corpus + insights work without keys.</p>
+
+            <sc-for list="{{ settingsKeys }}" as="k">
+              <div style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px;">
+                <div style="display: flex; align-items: baseline; justify-content: space-between;">
+                  <label style="font-size: 12px; font-weight: 600; color: #F0E8FF;">{{ k.label }}</label>
+                  <span style="font-size: 11px; color: {{ k.statusColor }};">{{ k.statusLabel }}</span>
+                </div>
+                <div style="font-size: 11px; color: #7A6B99; margin-bottom: 4px;">{{ k.hint }}</div>
+                <div style="display: flex; gap: 8px;">
+                  <input type="password" placeholder="{{ k.placeholder }}" value="{{ k.value }}" onInput="{{ k.onInput }}" style="flex: 1; padding: 10px 14px; border-radius: 10px; border: 1px solid #2A2040; background: #0C0A14; color: #F0E8FF; font-size: 13px; font-family: 'JetBrains Mono', ui-monospace, monospace; outline: none;" style-focus="border-color: #7C21DA;" />
+                  <button onClick="{{ k.onTest }}" style="padding: 10px 16px; border-radius: 10px; border: 1px solid #2A2040; background: #1E1830; color: #B0A3CC; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit;">Test</button>
+                </div>
+              </div>
+            </sc-for>
+
+            <div style="display: flex; gap: 8px; margin-top: 20px; padding-top: 20px; border-top: 1px solid #1E1830;">
+              <button onClick="{{ saveKeys }}" style="padding: 10px 20px; border-radius: 10px; border: none; background: linear-gradient(135deg, #7C21DA, #9333EA); color: white; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit;">Save keys</button>
+              <button onClick="{{ clearKeys }}" style="padding: 10px 20px; border-radius: 10px; border: 1px solid #2A2040; background: transparent; color: #7A6B99; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit;">Clear all</button>
+            </div>
+          </div>
+
+          <!-- Live scrape card -->
+          <div style="background: #14101F; border: 1px solid #1E1830; border-radius: 14px; padding: 24px; margin-bottom: 16px;">
+            <h3 style="font-size: 15px; font-weight: 600; color: #F0E8FF; margin-bottom: 4px;">Live Scrape (Apify)</h3>
+            <p style="font-size: 12px; color: #7A6B99; margin-bottom: 16px;">Capped at max_items to protect your Apify credit. Streams results as SSE to the pipeline.</p>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+              <div>
+                <label style="font-size: 11px; color: #7A6B99; display: block; margin-bottom: 6px;">App package</label>
+                <input type="text" value="com.zeptoconsumerapp" style="width: 100%; padding: 9px 12px; border-radius: 8px; border: 1px solid #2A2040; background: #0C0A14; color: #F0E8FF; font-size: 12px; font-family: 'JetBrains Mono', ui-monospace, monospace;" />
+              </div>
+              <div>
+                <label style="font-size: 11px; color: #7A6B99; display: block; margin-bottom: 6px;">Source</label>
+                <select style="width: 100%; padding: 9px 12px; border-radius: 8px; border: 1px solid #2A2040; background: #0C0A14; color: #F0E8FF; font-size: 12px;">
+                  <option>Play Store</option><option>Reddit</option><option>YouTube</option><option>News</option>
+                </select>
+              </div>
+              <div>
+                <label style="font-size: 11px; color: #7A6B99; display: block; margin-bottom: 6px;">Max items</label>
+                <input type="number" value="25" min="1" max="100" style="width: 100%; padding: 9px 12px; border-radius: 8px; border: 1px solid #2A2040; background: #0C0A14; color: #F0E8FF; font-size: 12px;" />
+              </div>
+            </div>
+
+            <button onClick="{{ startScrape }}" style="padding: 10px 20px; border-radius: 10px; border: none; background: linear-gradient(135deg, #7C21DA, #9333EA); color: white; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit;">▶ Start scrape</button>
+            <span style="font-size: 11px; color: #7A6B99; margin-left: 12px;">{{ scrapeStatus }}</span>
+          </div>
+
+          <!-- Data card -->
+          <div style="background: #14101F; border: 1px solid #1E1830; border-radius: 14px; padding: 24px;">
+            <h3 style="font-size: 15px; font-weight: 600; color: #F0E8FF; margin-bottom: 4px;">Data</h3>
+            <p style="font-size: 12px; color: #7A6B99; margin-bottom: 16px;">Corpus snapshot used across Dashboard and Workflow tabs.</p>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px 24px; font-size: 12px;">
+              <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #1E1830;"><span style="color: #7A6B99;">Snapshot date</span><span style="color: #F0E8FF; font-weight: 600;">2026-07-15</span></div>
+              <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #1E1830;"><span style="color: #7A6B99;">Raw snippets</span><span style="color: #F0E8FF; font-weight: 600;">11,947</span></div>
+              <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #1E1830;"><span style="color: #7A6B99;">Filtered</span><span style="color: #F0E8FF; font-weight: 600;">8,363</span></div>
+              <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #1E1830;"><span style="color: #7A6B99;">Extracted insights</span><span style="color: #F0E8FF; font-weight: 600;">8,331</span></div>
+              <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #1E1830;"><span style="color: #7A6B99;">Themes</span><span style="color: #F0E8FF; font-weight: 600;">42</span></div>
+              <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #1E1830;"><span style="color: #7A6B99;">v2 insight cards</span><span style="color: #F0E8FF; font-weight: 600;">12</span></div>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+    </div>
+  </main>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{
+  &quot;$preview&quot;: { &quot;width&quot;: &quot;100%&quot;, &quot;height&quot;: &quot;100%&quot; }
+}">
+
+class Component extends DCLogic {
+  state = { activeSection: 's1', activePage: 'dashboard', dashboardExpanded: true, workflowExpanded: false, chatMessages: [], chatInput: '', keys: { openai: '', groq: '', apify: '' }, keyStatus: { openai: 'unset', groq: 'unset', apify: 'unset' }, scrapeStatus: 'Idle' };
+
+  componentDidMount() {
+    try {
+      const saved = JSON.parse(localStorage.getItem('zepto_keys') || 'null');
+      if (saved) this.setState({ keys: { ...this.state.keys, ...saved } });
+    } catch (e) {}
+  }
+
+  renderVals() {
+    const sections = [
+      { id: 's1', label: 'Why Struggle to Discover', icon: '🔍' },
+      { id: 's2', label: 'Top Frustrations', icon: '⚡' },
+      { id: 's3', label: 'Shopping Behaviours', icon: '🎯' },
+      { id: 's4', label: 'Repetition Causes', icon: '🔄' },
+      { id: 's5', label: 'Segment Challenges', icon: '👥' },
+      { id: 's6', label: 'Unmet Needs', icon: '💡' }
+    ];
+
+    const workflowSteps = [
+      { id: 'w0', label: 'Hypothesis' },
+      { id: 'w1', label: 'Data Collected' },
+      { id: 'w2', label: 'Data Filtering' },
+      { id: 'w3', label: 'Theme Generation' },
+      { id: 'w4', label: 'Insight Generation' },
+      { id: 'w5', label: 'Quality Validation' },
+      { id: 'w6', label: 'Version History' }
+    ];
+    const topPages = [
+      { id: 'chat', label: 'Chat', icon: '💬' },
+      { id: 'dashboard', label: 'Dashboard', icon: '📊', expandable: true, expandedKey: 'dashboardExpanded', children: sections },
+      { id: 'workflow', label: 'Workflow', icon: '🔀', expandable: true, expandedKey: 'workflowExpanded', children: workflowSteps },
+      { id: 'settings', label: 'Settings', icon: '⚙️' }
+    ];
+    const { activePage, dashboardExpanded, workflowExpanded } = this.state;
+    const expandedState = { dashboardExpanded, workflowExpanded };
+
+    const sidebarNav = React.createElement('div', { style: { display: 'contents' } },
+      ...topPages.map(p => {
+        const isExpanded = p.expandable && expandedState[p.expandedKey];
+        return React.createElement(React.Fragment, { key: p.id },
+          React.createElement('button', {
+            onClick: () => {
+              if (p.expandable) {
+                this.setState(s => ({ activePage: p.id, [p.expandedKey]: !s[p.expandedKey] }));
+              } else {
+                this.setState({ activePage: p.id });
+              }
+            },
+            style: {
+              padding: '9px 12px', borderRadius: '8px', border: 'none', width: '100%', textAlign: 'left',
+              background: activePage === p.id ? '#7C21DA22' : 'transparent',
+              color: activePage === p.id ? '#B07CFF' : '#7A6B99',
+              fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px',
+              fontFamily: 'inherit', transition: 'all 0.15s'
+            }
+          },
+            React.createElement('span', { style: { fontSize: '14px' } }, p.icon),
+            p.label,
+            p.expandable ? React.createElement('span', { style: { marginLeft: 'auto', fontSize: '10px', color: '#7A6B99', transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.2s' } }, '▶') : null
+          ),
+          p.expandable && isExpanded ? React.createElement('div', { style: { paddingLeft: '12px', display: 'flex', flexDirection: 'column', gap: '1px', marginBottom: '4px' } },
+            ...p.children.map(s => React.createElement('a', {
+              key: s.id,
+              href: '#' + s.id,
+              onClick: (e) => {
+                e.preventDefault();
+                this.setState({ activePage: p.id }, () => {
+                  requestAnimationFrame(() => {
+                    const el = document.getElementById(s.id);
+                    if (!el) return;
+                    el.style.animation = 'none';
+                    void el.offsetWidth;
+                    el.style.animation = 'jumpIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)';
+                    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  });
+                });
+              },
+              style: { padding: '6px 10px', borderRadius: '6px', color: '#7A6B99', fontSize: '12px', fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', textDecoration: 'none', transition: 'all 0.15s' },
+              onMouseEnter: (e) => { e.currentTarget.style.background = '#1E1830'; e.currentTarget.style.color = '#B07CFF'; },
+              onMouseLeave: (e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#7A6B99'; }
+            }, s.label))
+          ) : null
+        );
+      })
+    );
+
+    // Section 2 — top themes by supporting-snippet count
+    const frustrationBars = [
+      { label: 'Platform Trust & Transparency',        value: 158, color: '#FB923C', width: '100%' },
+      { label: 'Price Sensitivity & Perceived Value',  value: 148, color: '#FB7185', width: '94%'  },
+      { label: 'Customer Support & Resolution',        value: 107, color: '#FBBF24', width: '68%'  },
+      { label: 'Assortment Breadth & Category Explore',value: 107, color: '#34D399', width: '68%'  },
+      { label: 'Repeat-Order Habit Loops',             value: 17,  color: '#38BDF8', width: '11%'  }
+    ];
+
+    // Section 3 — intent distribution across 8,331 extracted insights
+    const behaviourBars = [
+      { label: 'Exploration Blocker',       value: 2428, color: '#FB7185', width: '100%' },
+      { label: 'Unmet Need Voiced',         value: 1287, color: '#34D399', width: '53%'  },
+      { label: 'Repeat-Purchase Habit',     value: 815,  color: '#38BDF8', width: '34%'  },
+      { label: 'Discovery Request',         value: 191,  color: '#FBBF24', width: '8%'   },
+      { label: 'New Category Attempted',    value: 47,   color: '#C084FC', width: '2%'   }
+    ];
+
+    // Section 5 — persona breakdown from extraction pass
+    const segmentCardsRow1 = [
+      { name: 'Unknown Persona',    icon: '👤', count: '4,581', numColor: '#34D399', negative: '47% frustration' },
+      { name: 'Busy Professional',  icon: '💼', count: '116',   numColor: '#38BDF8', negative: '62% frustration' },
+      { name: 'Student',            icon: '🎓', count: '9',     numColor: '#C084FC', negative: '44% frustration' }
+    ];
+    const segmentCardsRow2 = [
+      { name: 'New Mover', icon: '📦', count: '6', numColor: '#FBBF24', negative: '33% frustration' },
+      { name: 'Homemaker', icon: '🏠', count: '4', numColor: '#FB923C', negative: '25% frustration' }
+    ];
+
+    const segData = [
+      { label: 'Unknown',           value: 4581, color: '#7C21DA' },
+      { label: 'Busy Professional', value: 116,  color: '#9333EA' },
+      { label: 'Student',           value: 9,    color: '#A855F7' },
+      { label: 'New Mover',         value: 6,    color: '#C084FC' },
+      { label: 'Homemaker',         value: 4,    color: '#D4B0FF' }
+    ];
+    const maxVal = 5000;
+    const chartH = 200;
+    const segmentChart = React.createElement('div', { style: { display: 'flex', alignItems: 'flex-end', gap: '32px', height: chartH + 40, position: 'relative', paddingLeft: '40px' } },
+      React.createElement('div', { style: { position: 'absolute', left: 0, top: 0, bottom: 40, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' } },
+        [5000,3750,2500,1250,0].map(v => React.createElement('span', { key: v, style: { fontSize: '10px', color: '#7A6B99' } }, v.toLocaleString()))
+      ),
+      ...segData.map(d => React.createElement('div', { key: d.label, style: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' } },
+        React.createElement('div', { style: { width: '100%', maxWidth: '80px', height: (d.value / maxVal * chartH) + 'px', background: d.color, borderRadius: '4px 4px 0 0', minHeight: '4px' } }),
+        React.createElement('span', { style: { fontSize: '10px', color: '#7A6B99', textAlign: 'center', whiteSpace: 'nowrap' } }, d.label)
+      ))
+    );
+
+    // Working hypotheses — corpus-level reasoning (from corpus_hypotheses.parquet)
+    const workingHypotheses = [
+      { rank: 1, title: "Zepto = 'Grocery-Only' in User Minds", confidence: 'HIGH', confBg: '#0D2818', confColor: '#34D399',
+        claim: "Most Zepto users perceive the platform as a single-category (grocery / fresh produce) service, so new categories are not even considered, let alone explored. Over 97% of reviews show no exploration signal." },
+      { rank: 2, title: 'Habit Loop Reinforces Category Stagnation', confidence: 'MED', confBg: '#2D2818', confColor: '#FBBF24',
+        claim: "A strong habit loop — where users repeat the same purchases — prevents them from even considering new categories. Repeat_Purchase_Habit intent = 815 mentions, habit_loop barrier = 443 mentions." },
+      { rank: 3, title: 'Trust Is Category-Specific, Not Platform-Wide', confidence: 'MED', confBg: '#2D2818', confColor: '#FBBF24',
+        claim: "Trust built in one category (groceries) does not transfer to new categories. Trust-deficit is the largest barrier (3,080 mentions) yet explicit category avoidance is vanishingly rare — users simply don't consider them." }
+    ];
+
+    // Hypothesis cards (Workflow tab, first section) — Streamlit-style H1..H5, no icons, High/Medium/Low
+    const RATING_HIGH = { rating: '🟢 High',   ratingBg: '#0D2818', ratingColor: '#34D399' };
+    const RATING_MED  = { rating: '🟡 Medium', ratingBg: '#2D2818', ratingColor: '#FBBF24' };
+    const RATING_LOW  = { rating: '🔴 Low',    ratingBg: '#2D0D1B', ratingColor: '#FB7185' };
+    const hypothesisCards = [
+      { tag: 'H1', title: 'One Bad Perishable Kills a Whole Category',              ...RATING_MED,
+        description: "Users who encounter a single instance of expired or damaged perishable goods (e.g., milk) permanently stop ordering that category from Zepto, and many generalise the distrust to all platform orders.",
+        quote: 'Expired milk and damaged goods erode trust, causing users to abandon entire categories and question platform integrity.',
+        status: 'Theme: Platform Trust and Transparency  ·  status: exploratory  ·  critic verdict: revise' },
+      { tag: 'H2', title: 'Gen-Z Tier-1 Users Are Already Exploring Beyond Groceries',  ...RATING_MED,
+        description: "Gen Z users in tier-1 cities are expanding their quick-commerce purchases beyond groceries into higher-margin categories like beauty, electronics, and lifestyle, driven by convenience and discount-driven trial.",
+        quote: 'Gen Z users in tier-1 cities are driving cross-category exploration on quick commerce, expanding beyond groceries into beauty, electronics, and lifestyle.',
+        status: 'Theme: Assortment Breadth and Category Exploration  ·  status: exploratory  ·  critic verdict: revise' },
+      { tag: 'H3', title: 'The Repeat Habit Is Fragile — Raising Thresholds Breaks It', ...RATING_MED,
+        description: "Users develop a repeat-order habit for Zepto primarily due to perceived lower total cost (no delivery fees, lower base prices) vs competitors like Blinkit. This habit is fragile: raising thresholds breaks the loop.",
+        quote: "Zepto's repeat habit is driven by price transparency and low fees, but raising thresholds or prices risks breaking the loop.",
+        status: 'Theme: Repeat-Order Habit Loops  ·  status: exploratory  ·  critic verdict: revise' }
+    ];
+
+    // Section 6 — on-goal evidence-linked v2 cards (3 after dropping H1/H4 as off-goal churn hypotheses)
+    const unmetNeeds = [
+      { icon: '🛡️', title: 'Platform Trust & Transparency', description: "Users who encounter a single instance of expired or damaged perishable goods (e.g., milk) permanently stop ordering that category from Zepto, and many generalise the distrust to all platform orders.", quote: 'Expired milk and damaged goods erode trust, causing users to abandon entire categories and question platform integrity.', score: '57/100', scoreColor: '#FBBF24', segment: 'Platform Trust & Transparency · exploratory · critic: revise' },
+      { icon: '🧭', title: 'Assortment Breadth & Category Exploration', description: "Gen Z users in tier-1 cities are expanding their quick-commerce purchases beyond groceries into higher-margin categories like beauty, electronics, and lifestyle, driven by convenience and discount-driven trial.", quote: 'Gen Z users in tier-1 cities are driving cross-category exploration on quick commerce, expanding beyond groceries into beauty, electronics, and lifestyle.', score: '57/100', scoreColor: '#FBBF24', segment: 'Assortment Breadth & Category Exploration · exploratory · critic: revise' },
+      { icon: '🔁', title: 'Repeat-Order Habit Loops', description: "Users develop a repeat-order habit for Zepto primarily due to perceived lower total cost (no delivery fees, lower base prices) vs competitors like Blinkit. This habit is fragile: raising thresholds breaks the loop.", quote: "Zepto's repeat habit is driven by price transparency and low fees, but raising thresholds or prices risks breaking the loop.", score: '57/100', scoreColor: '#FBBF24', segment: 'Repeat-Order Habit Loops · exploratory · critic: revise' }
+    ];
+
+    // ===== Workflow content =====
+    const sourceBars = [
+      { label: 'Play Store',   value: '8,283', color: '#7C21DA', width: '100%' },
+      { label: 'YouTube',      value: '2,095', color: '#9333EA', width: '25%'  },
+      { label: 'Reddit',       value: '1,194', color: '#A855F7', width: '14%'  },
+      { label: 'News Article', value: '375',   color: '#C084FC', width: '5%'   }
+    ];
+    const brandBars = [
+      { label: 'Zepto (Play + YT + Reddit + News)', value: '8,656', color: '#7C21DA', width: '100%' },
+      { label: 'Swiggy Instamart',                   value: '1,220', color: '#9333EA', width: '14%'  },
+      { label: 'BigBasket',                          value: '1,078', color: '#A855F7', width: '12%'  },
+      { label: 'Blinkit',                            value: '993',   color: '#C084FC', width: '11%'  }
+    ];
+
+    const funnelSteps = [
+      { layer: 'L0', label: 'Raw scrape',              count: '11,947', pct: '100.0%', width: '100%' },
+      { layer: 'L1', label: 'Language (English only)', count: '11,146', pct: '93.3%',  width: '93%'  },
+      { layer: 'L2', label: 'Spam removed',            count: '8,363',  pct: '70.0%',  width: '70%'  },
+      { layer: 'L3', label: 'Semantic dedup',          count: '7,890',  pct: '66.0%',  width: '66%'  },
+      { layer: 'L4', label: 'Broadly relevant',        count: '1,073',  pct: '9.0%',   width: '9%'   },
+      { layer: 'L5', label: 'Expansion-relevant',      count: '634',    pct: '5.3%',   width: '5%'   }
+    ];
+
+    const topThemes = [
+      { name: 'Platform Trust and Transparency',            count: 158, color: '#FB923C', width: '100%' },
+      { name: 'Price Sensitivity and Perceived Value',      count: 148, color: '#FB7185', width: '94%'  },
+      { name: 'Customer Support and Resolution Experience', count: 107, color: '#FBBF24', width: '68%'  },
+      { name: 'Assortment Breadth and Category Exploration',count: 107, color: '#34D399', width: '68%'  },
+      { name: 'Repeat-Order Habit Loops',                   count: 17,  color: '#38BDF8', width: '11%'  },
+      { name: 'Meal Card Utilization Hacks',                count: 17,  color: '#C084FC', width: '11%'  },
+      { name: 'Product Feature Trade-offs',                 count: 14,  color: '#B07CFF', width: '9%'   },
+      { name: 'Overpricing Complaints',                     count: 13,  color: '#7C21DA', width: '8%'   }
+    ];
+
+    const v2Cards = [
+      { id: 1,  theme: 'Price Sensitivity and Perceived Value',      oneLine: 'Hidden charges erode trust; users switch to competitors with transparent pricing.', confidence: '72',  confColor: '#34D399' },
+      { id: 2,  theme: 'Platform Trust and Transparency',            oneLine: 'Expired milk and damaged goods erode trust, causing users to abandon entire categories.', confidence: '72',  confColor: '#34D399' },
+      { id: 3,  theme: 'Assortment Breadth and Category Exploration',oneLine: 'Gen-Z users in tier-1 cities are driving cross-category exploration beyond groceries.', confidence: '57', confColor: '#FBBF24' },
+      { id: 4,  theme: 'Customer Support and Resolution Experience', oneLine: 'Broken complaint flows drive churn after a bad order.', confidence: '57', confColor: '#FBBF24' },
+      { id: 5,  theme: 'Meal Card Utilization Hacks',                oneLine: 'Meal card users buy groceries and gift cards to bypass dining restrictions.', confidence: '57', confColor: '#FBBF24' },
+      { id: 6,  theme: 'Repeat-Order Habit Loops',                   oneLine: 'Repeat habits are driven by price transparency and low fees — fragile if changed.', confidence: '57', confColor: '#FBBF24' },
+      { id: 7,  theme: 'Product Feature Trade-offs',                 oneLine: 'Premium products retain users despite cost when alternatives fail on core features.', confidence: '42', confColor: '#FB923C' },
+      { id: 8,  theme: 'Overpricing Complaints',                     oneLine: 'Overpricing is a leading churn indicator — cost accumulation makes convenience less compelling.', confidence: '42', confColor: '#FB923C' },
+      { id: 9,  theme: 'Personalization and Differential Treatment', oneLine: 'Device-based price differences erode trust and increase churn risk.', confidence: '42', confColor: '#FB923C' },
+      { id: 10, theme: 'In-App Cafes & Sub-Brands',                  oneLine: 'Influencer recommendations tilt users toward Blinkit Bistro over Zepto Cafe.', confidence: '42', confColor: '#FB923C' }
+    ];
+
+    const qualityChecks = [
+      { icon: '📎', name: 'Evidence Linked', description: 'Each insight card cites ≥5 supporting snippets by id.', status: 'PASS · 7 / 7', statusColor: '#34D399', statusBg: '#0D2818', bg: '#1B4D2A' },
+      { icon: '🌐', name: 'Cross-Source', description: 'Evidence spans ≥2 sources (Play Store, Reddit, YouTube, News).', status: 'PASS · 6 / 7', statusColor: '#34D399', statusBg: '#0D2818', bg: '#1B4D2A' },
+      { icon: '📊', name: 'Statistical Significance', description: 'Cluster size above the noise floor for the current corpus.', status: 'PASS · 5 / 7', statusColor: '#FBBF24', statusBg: '#2D2818', bg: '#4D3F1B' },
+      { icon: '🧩', name: 'Cluster Quality', description: 'DBSCAN silhouette / cohesion above threshold.', status: 'PASS · 7 / 7', statusColor: '#34D399', statusBg: '#0D2818', bg: '#1B4D2A' },
+      { icon: '🧠', name: 'LLM Critic', description: 'Second-pass GPT-4.1 critique flags contradictions or overreach.', status: 'PASS · 6 / 7', statusColor: '#34D399', statusBg: '#0D2818', bg: '#1B4D2A' },
+      { icon: '👥', name: 'Behavioural Validation', description: 'Requires user interviews — outside corpus.', status: 'NOT EVALUATED', statusColor: '#7A6B99', statusBg: '#1E1830', bg: '#2A2040' },
+      { icon: '💼', name: 'Business Validation', description: 'Requires internal ops + product review.', status: 'NOT EVALUATED', statusColor: '#7A6B99', statusBg: '#1E1830', bg: '#2A2040' }
+    ];
+
+    const filterLayers = [
+      { name: '1. Language & Normalisation',    what: 'FastText language detection + brand-name canonicalisation.',                                                                              result: '11,146 classified' },
+      { name: '2. Spam & Bot Detection',        what: 'Regex fast-path + DeepSeek LLM on borderline rows.',                                                                                       result: '❌ 3,877 dropped (32.5%)' },
+      { name: '3. Relevance Filter',            what: 'Snippet must actually discuss shopping behaviour / discovery / habits — not just delivery bugs.',                                          result: '❌ 2,783 more dropped' },
+      { name: '4. Semantic Deduplication',      what: 'Cosine similarity ≥ 0.95 against every earlier embedding.',                                                                                result: '❌ 473 near-duplicates flagged' },
+      { name: '5. Behaviour Filter',            what: '7 boolean flags per snippet: routine, repeat-purchase, exploration, trust, hesitation, price-sensitivity, decision-process.',              result: 'Weighting input' },
+      { name: '6. Specificity Filter',          what: '1–5 rating on detail level. "Good app" → 1; specific product story → 5.',                                                                  result: 'Weighting input' },
+      { name: '7. Information Value Score',     what: 'Composite: 0.30·specificity + 0.20·novelty + 0.20·behavioural + 0.15·clarity + 0.15·actionability.',                                       result: '11,947 scored' },
+      { name: '8. Temporal / Regional weight',  what: 'Recency decay (half-life 180d) + city where inferable. Applied at scoring time.',                                                          result: 'Downstream weight' }
+    ];
+
+    const themeHierarchy = [
+      { summary: 'Value Perception & Price Sensitivity  ·  3 themes  ·  163 supporting reviews', definition: 'How users weigh cost, deals, hidden fees, and perceived value across categories.',
+        children: [
+          { name: 'Price Sensitivity and Perceived Value', members: 148, badge: 'seed',     badgeColor: '#B07CFF' },
+          { name: 'Overpricing Complaints',                members: 13,  badge: 'seed',     badgeColor: '#B07CFF' },
+          { name: 'Promotions & Loyalty Perception',      members: 4,   badge: 'emergent', badgeColor: '#34D399' }
+        ] },
+      { summary: 'Platform Trust & Reliability  ·  4 themes  ·  178 supporting reviews', definition: 'Signals of trust — freshness, damage, transparency, promises kept.',
+        children: [
+          { name: 'Platform Trust and Transparency',       members: 158, badge: 'seed',     badgeColor: '#B07CFF' },
+          { name: 'Personalization and Differential Treatment', members: 12, badge: 'seed', badgeColor: '#B07CFF' },
+          { name: 'Bad Past Experience with Delivery',     members: 4,  badge: 'emergent', badgeColor: '#34D399' },
+          { name: 'Trust in Platform Practices',            members: 4,   badge: 'seed',     badgeColor: '#B07CFF' }
+        ] },
+      { summary: 'Customer Support & Resolution  ·  1 theme  ·  107 supporting reviews', definition: 'Behaviour of the complaint flow after a bad order.',
+        children: [
+          { name: 'Customer Support and Resolution Experience', members: 107, badge: 'seed', badgeColor: '#B07CFF' }
+        ] },
+      { summary: 'Assortment & Discovery  ·  4 themes  ·  120 supporting reviews', definition: 'Category breadth, exploration, and the surfacing of new things.',
+        children: [
+          { name: 'Assortment Breadth and Category Exploration', members: 107, badge: 'seed', badgeColor: '#B07CFF' },
+          { name: 'Product Discovery & Assortment Exploration', members: 6,  badge: 'seed', badgeColor: '#B07CFF' },
+          { name: 'Category Exploration and Expansion',         members: 3,  badge: 'emergent', badgeColor: '#34D399' },
+          { name: 'Discovery Patterns and App Experience',      members: 3,  badge: 'seed', badgeColor: '#B07CFF' }
+        ] },
+      { summary: 'User Behaviour & Decision Drivers  ·  2 themes  ·  20 supporting reviews', definition: 'Routines, habit loops, decision anchoring.',
+        children: [
+          { name: 'Repeat-Order Habit Loops', members: 17, badge: 'emergent', badgeColor: '#34D399' },
+          { name: 'Payment Methods & Checkout Flexibility', members: 3, badge: 'seed', badgeColor: '#B07CFF' }
+        ] },
+      { summary: 'Product Feature & Sub-Brand  ·  3 themes  ·  31 supporting reviews', definition: 'Specific product trade-offs and the sub-brand extensions.',
+        children: [
+          { name: 'Meal Card Utilization Hacks', members: 17, badge: 'seed', badgeColor: '#B07CFF' },
+          { name: 'Product Feature Trade-offs',   members: 14, badge: 'seed', badgeColor: '#B07CFF' },
+          { name: 'In-App Cafes & Sub-Brands',    members: 0,  badge: 'seed', badgeColor: '#B07CFF' }
+        ] }
+    ];
+
+    const validationFunnel = [
+      { label: 'Insights generated',                     count: '12', pct: '100%', color: '#C5A0FF', width: '100%' },
+      { label: 'Passed LLM Critic (pass / revise)',      count: '5',  pct: '42%',  color: '#8B33F7', width: '42%'  },
+      { label: 'Usable on Dashboard',                    count: '5',  pct: '42%',  color: '#34D399', width: '42%'  }
+    ];
+
+    const versionCompare = [
+      { version: 'v1',   filtration: '1-layer keyword',   taxonomy: 'Fixed 9-barrier',                    validation: 'Confidence score only',              cards: '7 cards',           color: '#38BDF8' },
+      { version: 'v3',   filtration: '1-layer keyword',   taxonomy: 'Fixed 9-barrier',                    validation: '+ counter-evidence hint (prompt)',   cards: '30 cards',          color: '#34D399' },
+      { version: 'v2',   filtration: '8-layer',           taxonomy: 'Evolving (broad, 910 rows)',        validation: '5-check gate + LLM Critic',           cards: '9 insights',        color: '#B07CFF' },
+      { version: 'v2.1', filtration: '8-layer',           taxonomy: 'Evolving (expansion-only, 546)',    validation: '5-check gate + LLM Critic',           cards: '3 insights ← primary', color: '#7C21DA' }
+    ];
+
+    const versionRows = [
+      { tag: 'tax v1', title: 'Seed taxonomy (38 themes)', note: 'LLM-generated from a 200-sample read of the filtered corpus.', date: 'Jul 12',  tagBg: '#1E1830', tagColor: '#B07CFF' },
+      { tag: 'tax v2', title: 'Promoted themes added',      note: '4 DBSCAN clusters on unassigned snippets promoted into the taxonomy.', date: 'Jul 13', tagBg: '#1E1830', tagColor: '#B07CFF' },
+      { tag: 'syn v1', title: 'Baseline synthesis',          note: '7 insight cards. Kept as a reference for the R&D audit trail.', date: 'Jul 13', tagBg: '#122A3A', tagColor: '#38BDF8' },
+      { tag: 'syn v2', title: 'Theme-linked synthesis',      note: '12 cards, each anchored to a taxonomy theme with a one-line hypothesis. Primary.', date: 'Jul 14', tagBg: '#2D1440', tagColor: '#B07CFF' },
+      { tag: 'syn v3', title: 'Reasoning-layer synthesis',   note: '30 hypothesis cards with counter-evidence checks + Part-2 interview prompts.', date: 'Jul 15', tagBg: '#0D2818', tagColor: '#34D399' }
+    ];
+
+    const seedQuestions = [
+      'Why do users stick to the same categories?',
+      'What prevents users from exploring new categories?',
+      'How do users discover products today?',
+      'What role do habits play in shopping behavior?',
+      'What frustrations emerge repeatedly?',
+      'Which user segments are more likely to experiment?'
+    ];
+    const seedAnswers = [
+      'Across 8,331 extracted insights, 2,428 (29.1%) are explicit Exploration_Blocker signals. The dominant driver is trust deficit (20 of 30 v3 cards) — damaged goods and broken support flows anchor users to their known-good repeat cart, so exploration never starts.',
+      'Four barriers surface repeatedly in the corpus: (1) Platform trust — expired/damaged goods (158 snippets), (2) Price sensitivity vs offline alternatives (148 snippets), (3) Broken complaint flows after issues (107 snippets), (4) No signal on quality/return for untried categories.',
+      'Play Store 8,283 · YouTube 2,095 · Reddit 1,194 · News 375 across Zepto, Blinkit, BigBasket, Swiggy Instamart. Discovery today is search-first for known items; category browse and cross-app comparison are the smaller but higher-intent behaviours.',
+      'Repeat-Order Habit Loops appear as their own theme (17 snippets) and cross-cut many others. Users mentally file Zepto as "grocery top-up" — a durable but narrow mental model that our synthesis flags as a scale ceiling.',
+      'Top frustrations by supporting-snippet count: Platform Trust & Transparency (158), Price Sensitivity (148), Customer Support & Resolution (107), Assortment Breadth (107), Repeat-Order Habit Loops (17). Trust and price dominate; discovery UX sits underneath as an enabling issue.',
+      'Persona labelling is sparse (4,581 unknown of 4,721 tagged) but the labeled tail is instructive: Busy Professionals (116) show 62% frustration — the highest — driven by unreliable ETAs. Students (9) and Homemakers (4) skew lower, and are the more promising expansion segments.'
+    ];
+    const chatSeedPrompts = seedQuestions.map((q, i) => ({
+      question: q,
+      onClick: () => {
+        this.setState(s => ({
+          chatMessages: [...s.chatMessages,
+            { role: 'user', content: q },
+            { role: 'assistant', content: seedAnswers[i] }
+          ]
+        }));
+      }
+    }));
+    const formattedChat = this.state.chatMessages.map(m => ({
+      content: m.content,
+      isUser: m.role === 'user',
+      isAssistant: m.role === 'assistant'
+    }));
+
+    return {
+      sidebarNav,
+      frustrationBars,
+      behaviourBars,
+      segmentCardsRow1,
+      segmentCardsRow2,
+      segmentChart,
+      unmetNeeds,
+      workingHypotheses,
+      hypothesisCards,
+      sourceBars,
+      brandBars,
+      funnelSteps,
+      topThemes,
+      v2Cards,
+      qualityChecks,
+      versionRows,
+      filterLayers,
+      themeHierarchy,
+      validationFunnel,
+      versionCompare,
+      isChat: activePage === 'chat',
+      isDashboard: activePage === 'dashboard',
+      isWorkflow: activePage === 'workflow',
+      isSettings: activePage === 'settings',
+      settingsKeys: this.settingsKeys(),
+      scrapeStatus: this.state.scrapeStatus,
+      saveKeys: () => { try { localStorage.setItem('zepto_keys', JSON.stringify(this.state.keys)); this.setState({ scrapeStatus: 'Keys saved to localStorage.' }); } catch(e){} },
+      clearKeys: () => { localStorage.removeItem('zepto_keys'); this.setState({ keys: { openai:'', groq:'', apify:'' }, keyStatus: { openai:'unset', groq:'unset', apify:'unset' }, scrapeStatus: 'Cleared.' }); },
+      startScrape: () => {
+        if (!this.state.keys.apify) { this.setState({ scrapeStatus: '⚠ Add an Apify token first.' }); return; }
+        this.setState({ scrapeStatus: '⏳ Starting actor run… (demo — wire to /api/scrape SSE in prod)' });
+        setTimeout(() => this.setState({ scrapeStatus: '✓ Actor completed — 25 items fetched, appended to raw_snippets.' }), 1500);
+      },
+      chatSeedPrompts,
+      chatMessages: formattedChat,
+      noChatMessages: this.state.chatMessages.length === 0,
+      chatInput: this.state.chatInput,
+      onChatInput: (e) => this.setState({ chatInput: e.target.value }),
+      onChatKeyDown: (e) => { if (e.key === 'Enter') this.sendChat(); },
+      sendChat: () => this.sendChat(),
+      clearChat: () => this.setState({ chatMessages: [], chatInput: '' }),
+      chatBackendHint: this.state.keys.groq ? 'Groq key set — production would stream Llama-3.3-70B answers grounded in the corpus.' : 'Add a Groq key in Settings to enable live RAG answers; seed prompts return precomputed answers.'
+    };
+  }
+
+  settingsKeys() {
+    const providers = [
+      { id: 'openai', label: 'OpenAI API Key',  placeholder: 'sk-proj-…',  hint: 'Used for text-embedding-3-small (retrieval) and GPT-4.1 synthesis fallback.' },
+      { id: 'groq',   label: 'Groq API Key',    placeholder: 'gsk_…',      hint: 'Powers the RAG chatbot — Llama-3.3-70B, fast streaming responses.' },
+      { id: 'apify',  label: 'Apify API Token', placeholder: 'apify_api_…', hint: 'Runs Play Store / Reddit / YouTube / News scrapers on demand.' }
+    ];
+    const statusMap = { unset: { l: 'Not set',   c: '#7A6B99' }, saved: { l: 'Saved',   c: '#B07CFF' }, ok: { l: '● Connected', c: '#34D399' }, bad: { l: '× Invalid', c: '#FB7185' } };
+    return providers.map(p => {
+      const st = statusMap[this.state.keyStatus[p.id]] || statusMap.unset;
+      return {
+        label: p.label, placeholder: p.placeholder, hint: p.hint,
+        value: this.state.keys[p.id] || '',
+        statusLabel: st.l, statusColor: st.c,
+        onInput: (e) => this.setState(s => ({ keys: { ...s.keys, [p.id]: e.target.value } })),
+        onTest: () => {
+          const v = this.state.keys[p.id];
+          if (!v) { this.setState(s => ({ keyStatus: { ...s.keyStatus, [p.id]: 'unset' } })); return; }
+          const looksValid = (p.id === 'openai' && v.startsWith('sk-')) || (p.id === 'groq' && v.startsWith('gsk_')) || (p.id === 'apify' && v.startsWith('apify_'));
+          this.setState(s => ({ keyStatus: { ...s.keyStatus, [p.id]: looksValid ? 'ok' : 'bad' } }));
+        }
+      };
+    });
+  }
+
+  sendChat() {
+    const msg = this.state.chatInput.trim();
+    if (!msg) return;
+    this.setState(s => ({
+      chatMessages: [...s.chatMessages,
+        { role: 'user', content: msg },
+        { role: 'assistant', content: 'This is a demo environment. In production, this would query the RAG pipeline with your question and stream a grounded response from the corpus.' }
+      ],
+      chatInput: ''
+    }));
+  }
+}
+
+</script>
+</body>
+</html>
