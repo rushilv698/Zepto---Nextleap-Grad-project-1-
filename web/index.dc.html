@@ -55,10 +55,10 @@
         <h1 style="font-size: 22px; font-weight: 800; color: #F0E8FF; margin-bottom: 2px;">Discovery Intelligence Dashboard</h1>
         <span style="font-size: 12px; color: #7A6B99;">Runs every Monday at 7:00 AM IST · Last refreshed: Jul 15, 2026</span>
       </div>
-      <div style="padding: 8px 16px; border-radius: 10px; background: #1E1830; border: 1px solid #2A2040; display: flex; align-items: center; gap: 8px; cursor: pointer;">
+      <button onClick="{{ openChat }}" style="padding: 8px 16px; border-radius: 10px; background: #1E1830; border: 1px solid #2A2040; display: flex; align-items: center; gap: 8px; cursor: pointer; font-family: inherit; transition: all 0.15s;" style-hover="background: #2A2040; border-color: #7C21DA;">
         <span style="font-size: 14px;">💬</span>
         <span style="font-size: 13px; color: #7A6B99;">Ask AI: "Why do users struggle to discover?"</span>
-      </div>
+      </button>
     </div>
 
     <div style="padding: 28px 32px;">
@@ -1314,6 +1314,7 @@ class Component extends DCLogic {
       onChatKeyDown: (e) => { if (e.key === 'Enter') this.sendChat(); },
       sendChat: () => this.sendChat(),
       clearChat: () => this.setState({ chatMessages: [], chatInput: '' }),
+      openChat: () => this.setState({ activePage: 'chat' }),
       chatBackendHint: this.state.keys.groq ? 'Groq key set — production would stream Llama-3.3-70B answers grounded in the corpus.' : 'Add a Groq key in Settings to enable live RAG answers; seed prompts return precomputed answers.'
     };
   }
