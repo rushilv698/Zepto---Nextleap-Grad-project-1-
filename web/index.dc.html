@@ -1247,24 +1247,9 @@ class Component extends DCLogic {
       'What frustrations emerge repeatedly?',
       'Which user segments are more likely to experiment?'
     ];
-    const seedAnswers = [
-      'Across 8,331 extracted insights, 2,428 (29.1%) are explicit Exploration_Blocker signals. The dominant driver is trust deficit (20 of 30 v3 cards) — damaged goods and broken support flows anchor users to their known-good repeat cart, so exploration never starts.',
-      'Four barriers surface repeatedly in the corpus: (1) Platform trust — expired/damaged goods (158 snippets), (2) Price sensitivity vs offline alternatives (148 snippets), (3) Broken complaint flows after issues (107 snippets), (4) No signal on quality/return for untried categories.',
-      'Play Store 8,283 · YouTube 2,095 · Reddit 1,194 · News 375 across Zepto, Blinkit, BigBasket, Swiggy Instamart. Discovery today is search-first for known items; category browse and cross-app comparison are the smaller but higher-intent behaviours.',
-      'Repeat-Order Habit Loops appear as their own theme (17 snippets) and cross-cut many others. Users mentally file Zepto as "grocery top-up" — a durable but narrow mental model that our synthesis flags as a scale ceiling.',
-      'Top frustrations by supporting-snippet count: Platform Trust & Transparency (158), Price Sensitivity (148), Customer Support & Resolution (107), Assortment Breadth (107), Repeat-Order Habit Loops (17). Trust and price dominate; discovery UX sits underneath as an enabling issue.',
-      'Persona labelling is sparse (4,581 unknown of 4,721 tagged) but the labeled tail is instructive: Busy Professionals (116) show 62% frustration — the highest — driven by unreliable ETAs. Students (9) and Homemakers (4) skew lower, and are the more promising expansion segments.'
-    ];
-    const chatSeedPrompts = seedQuestions.map((q, i) => ({
+    const chatSeedPrompts = seedQuestions.map(q => ({
       question: q,
-      onClick: () => {
-        this.setState(s => ({
-          chatMessages: [...s.chatMessages,
-            { role: 'user', content: q },
-            { role: 'assistant', content: seedAnswers[i] }
-          ]
-        }));
-      }
+      onClick: () => this.askGroq(q)
     }));
     const formattedChat = this.state.chatMessages.map(m => ({
       content: m.content,
@@ -1315,7 +1300,7 @@ class Component extends DCLogic {
       sendChat: () => this.sendChat(),
       clearChat: () => this.setState({ chatMessages: [], chatInput: '' }),
       openChat: () => this.setState({ activePage: 'chat' }),
-      chatBackendHint: this.state.keys.groq ? 'Groq key set — production would stream Llama-3.3-70B answers grounded in the corpus.' : 'Add a Groq key in Settings to enable live RAG answers; seed prompts return precomputed answers.'
+      chatBackendHint: this.state.keys.groq ? '✓ Groq key detected — questions run against Llama-3.3-70B with the corpus context loaded as system prompt.' : '⚠ Add a Groq key in Settings to run real RAG answers. Without a key, the model isn\'t called and no answer appears.'
     };
   }
 
@@ -1346,13 +1331,120 @@ class Component extends DCLogic {
   sendChat() {
     const msg = this.state.chatInput.trim();
     if (!msg) return;
+    this.setState({ chatInput: '' });
+    this.askGroq(msg);
+  }
+
+  corpusSystemPrompt() {
+    return [
+      'You are the Zepto AI Discovery Engine — a corpus-grounded analyst answering questions about a scraped user-feedback dataset.',
+      'STRATEGIC GOAL of this engine: increase the % of Monthly Active Customers who purchase from at least one new category every month. Frame every answer against this goal.',
+      '',
+      'CORPUS (frozen snapshot, Jul 2026):',
+      '- 11,947 raw snippets scraped from Play Store (8,283), YouTube (2,095), Reddit (1,194), News articles (375).',
+      '- 4 brands scraped: Zepto (primary — 8,656 snippets, 72%), Blinkit (993), BigBasket (1,078), Swiggy Instamart (1,220). Competitors are a control set, not the subject.',
+      '- 8-layer filter reduces 11,947 → 8,363 (not-spam) → 1,073 (broadly relevant) → 634 (goal-aligned: exploration/hesitation/decision).',
+      '- 8,331 extracted insights (structured JSON per snippet: intent, themes, persona, barrier, emotional tone).',
+      '',
+      'INTENT DISTRIBUTION across 8,331 extracted insights:',
+      '- Exploration_Blocker: 2,428 (29.1%) ← primary signal for the mission goal',
+      '- Unmet_Need: 1,287',
+      '- Repeat_Purchase_Habit: 815',
+      '- Discovery_Request: 191',
+      '',
+      'EMOTIONAL TONE: frustration 3,394 · contentment 775 · anger 361 · curiosity 135 · indifference 56.',
+      '',
+      'THEMES (42 total: 38 LLM-seeded + 4 DBSCAN-promoted). Top 5 by supporting-snippet count:',
+      '1. Platform Trust and Transparency — 158 snippets (expired/damaged perishables, promise-breaks)',
+      '2. Price Sensitivity and Perceived Value — 148 (hidden charges, delivery threshold changes)',
+      '3. Customer Support and Resolution Experience — 107 (broken complaint flows)',
+      '4. Assortment Breadth and Category Exploration — 107 (cross-category demand signals)',
+      '5. Repeat-Order Habit Loops — 17 (why users lock into one category)',
+      '',
+      'PERSONA breakdown (weakly self-identified): unknown 4,581 · Busy Professional 116 (62% frustration) · Student 9 · New Mover 6 · Homemaker 4. Only 140 of 4,721 tagged rows carry a persona label — persona claims should be directional, not populational.',
+      '',
+      'CORPUS-LEVEL WORKING HYPOTHESES (5, reasoned across the whole corpus including from what users DON\'T say):',
+      '  H1 [high] Zepto = "Grocery-Only" in User Minds: 97% of reviews show zero exploration signal; new categories aren\'t refused, they\'re not considered.',
+      '  H2 [med] Invisible UI: New categories are hidden in plain sight — discovery_UI barrier has only 63 mentions, meaning users don\'t even notice new categories to complain about them.',
+      '  H3 [med] Trust Is Category-Specific, Not Platform-Wide: grocery trust doesn\'t transfer to electronics/beauty/pet.',
+      '  H4 [med] Habit Loop Reinforces Category Stagnation: 815 repeat-purchase mentions + 443 habit_loop mentions.',
+      '  H5 [med] Category Expansion Lacks Social Proof: no organic buzz about new categories on YouTube (1,929 mentions) or Reddit (1,194).',
+      '',
+      'EVIDENCE-LINKED INSIGHT CARDS (3 on-goal after strategic filter):',
+      '  Card 1 [med] One Bad Perishable Kills a Whole Category (Platform Trust theme, 158 snippets)',
+      '  Card 2 [med] Gen-Z Tier-1 Users Are Already Exploring Beyond Groceries (Assortment Breadth theme, 107 snippets)',
+      '  Card 3 [med] The Repeat Habit Is Fragile — Raising Thresholds Breaks It (Repeat-Order theme, 17 snippets)',
+      '  (2 more evidence-linked cards passed the LLM Critic gate but were dropped as off-goal: they described churn to competitors, not category exploration.)',
+      '',
+      'WHAT THIS CORPUS CANNOT ANSWER (be honest about these gaps):',
+      '- Actual in-app user journey / which UI elements users click',
+      '- Latent curiosity that never surfaces in public reviews',
+      '- Behavioural validation (recommendation CTR, category visits, repeat purchases) — needs Zepto internal analytics',
+      '- Business/experiment validation (A/B uplift)',
+      '',
+      'ANSWER STYLE:',
+      '- Be concise (3–6 sentences unless the user asks for detail).',
+      '- Cite specific numbers from above when relevant.',
+      '- If the question is off-corpus (about the product roadmap, competitor strategy, general quick-commerce trends), say so honestly and answer only what the corpus supports.',
+      '- Do NOT fabricate quotes, review IDs, or numbers not in the context above.'
+    ].join('\n');
+  }
+
+  async askGroq(question) {
+    const key = (this.state.keys && this.state.keys.groq || '').trim();
+    if (!key) {
+      this.setState(s => ({
+        chatMessages: [...s.chatMessages,
+          { role: 'user', content: question },
+          { role: 'assistant', content: '⚠ No Groq API key set. Open **Settings** → paste a Groq key (starts with `gsk_`) → Save. Then ask again. Nothing is proxied through a backend — the browser calls Groq directly.' }
+        ]
+      }));
+      return;
+    }
+    const conversation = this.state.chatMessages.map(m => ({ role: m.role, content: m.content }));
     this.setState(s => ({
       chatMessages: [...s.chatMessages,
-        { role: 'user', content: msg },
-        { role: 'assistant', content: 'This is a demo environment. In production, this would query the RAG pipeline with your question and stream a grounded response from the corpus.' }
-      ],
-      chatInput: ''
+        { role: 'user', content: question },
+        { role: 'assistant', content: '…' }
+      ]
     }));
+    try {
+      const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
+        body: JSON.stringify({
+          model: 'llama-3.3-70b-versatile',
+          temperature: 0.2,
+          messages: [
+            { role: 'system', content: this.corpusSystemPrompt() },
+            ...conversation,
+            { role: 'user', content: question }
+          ]
+        })
+      });
+      if (!resp.ok) {
+        const errText = await resp.text();
+        this.setState(s => {
+          const msgs = s.chatMessages.slice(0, -1);
+          msgs.push({ role: 'assistant', content: '⚠ Groq API error (' + resp.status + '): ' + errText.slice(0, 300) });
+          return { chatMessages: msgs };
+        });
+        return;
+      }
+      const data = await resp.json();
+      const answer = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '(empty response)';
+      this.setState(s => {
+        const msgs = s.chatMessages.slice(0, -1);
+        msgs.push({ role: 'assistant', content: answer });
+        return { chatMessages: msgs };
+      });
+    } catch (err) {
+      this.setState(s => {
+        const msgs = s.chatMessages.slice(0, -1);
+        msgs.push({ role: 'assistant', content: '⚠ Network error calling Groq: ' + (err && err.message || String(err)) });
+        return { chatMessages: msgs };
+      });
+    }
   }
 }
 

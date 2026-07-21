@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "design-preview",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "8765", "--directory", "/private/tmp/claude-501/-Users-rushilv698-NextLeap-Grad-Project-1/f640362d-872d-4d88-87c0-9d06a4bfc901/scratchpad/design"],
+      "port": 8765
+    }
+  ]
+}
