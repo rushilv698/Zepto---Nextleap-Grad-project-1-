@@ -1300,14 +1300,13 @@ class Component extends DCLogic {
       sendChat: () => this.sendChat(),
       clearChat: () => this.setState({ chatMessages: [], chatInput: '' }),
       openChat: () => this.setState({ activePage: 'chat' }),
-      chatBackendHint: this.state.keys.groq ? '✓ Groq key detected — questions run against Llama-3.3-70B with the corpus context loaded as system prompt.' : '⚠ Add a Groq key in Settings to run real RAG answers. Without a key, the model isn\'t called and no answer appears.'
+      chatBackendHint: 'Runs against Groq Llama-3.3-70B via /api/chat serverless proxy — key is server-side, not exposed to the browser.'
     };
   }
 
   settingsKeys() {
     const providers = [
       { id: 'openai', label: 'OpenAI API Key',  placeholder: 'sk-proj-…',  hint: 'Used for text-embedding-3-small (retrieval) and GPT-4.1 synthesis fallback.' },
-      { id: 'groq',   label: 'Groq API Key',    placeholder: 'gsk_…',      hint: 'Powers the RAG chatbot — Llama-3.3-70B, fast streaming responses.' },
       { id: 'apify',  label: 'Apify API Token', placeholder: 'apify_api_…', hint: 'Runs Play Store / Reddit / YouTube / News scrapers on demand.' }
     ];
     const statusMap = { unset: { l: 'Not set',   c: '#7A6B99' }, saved: { l: 'Saved',   c: '#B07CFF' }, ok: { l: '● Connected', c: '#34D399' }, bad: { l: '× Invalid', c: '#FB7185' } };
@@ -1391,16 +1390,6 @@ class Component extends DCLogic {
   }
 
   async askGroq(question) {
-    const key = (this.state.keys && this.state.keys.groq || '').trim();
-    if (!key) {
-      this.setState(s => ({
-        chatMessages: [...s.chatMessages,
-          { role: 'user', content: question },
-          { role: 'assistant', content: '⚠ No Groq API key set. Open **Settings** → paste a Groq key (starts with `gsk_`) → Save. Then ask again. Nothing is proxied through a backend — the browser calls Groq directly.' }
-        ]
-      }));
-      return;
-    }
     const conversation = this.state.chatMessages.map(m => ({ role: m.role, content: m.content }));
     this.setState(s => ({
       chatMessages: [...s.chatMessages,
@@ -1409,12 +1398,10 @@ class Component extends DCLogic {
       ]
     }));
     try {
-      const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      const resp = await fetch('/api/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'llama-3.3-70b-versatile',
-          temperature: 0.2,
           messages: [
             { role: 'system', content: this.corpusSystemPrompt() },
             ...conversation,
@@ -1422,26 +1409,24 @@ class Component extends DCLogic {
           ]
         })
       });
+      const data = await resp.json().catch(() => ({}));
       if (!resp.ok) {
-        const errText = await resp.text();
         this.setState(s => {
           const msgs = s.chatMessages.slice(0, -1);
-          msgs.push({ role: 'assistant', content: '⚠ Groq API error (' + resp.status + '): ' + errText.slice(0, 300) });
+          msgs.push({ role: 'assistant', content: '⚠ Chat API error (' + resp.status + '): ' + (data.error || 'unknown') });
           return { chatMessages: msgs };
         });
         return;
       }
-      const data = await resp.json();
-      const answer = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '(empty response)';
       this.setState(s => {
         const msgs = s.chatMessages.slice(0, -1);
-        msgs.push({ role: 'assistant', content: answer });
+        msgs.push({ role: 'assistant', content: data.content || '(empty response)' });
         return { chatMessages: msgs };
       });
     } catch (err) {
       this.setState(s => {
         const msgs = s.chatMessages.slice(0, -1);
-        msgs.push({ role: 'assistant', content: '⚠ Network error calling Groq: ' + (err && err.message || String(err)) });
+        msgs.push({ role: 'assistant', content: '⚠ Network error calling /api/chat: ' + (err && err.message || String(err)) + '. If you\'re running locally with `python -m http.server`, the /api route only exists on Vercel — deploy to test the chatbot.' });
         return { chatMessages: msgs };
       });
     }
